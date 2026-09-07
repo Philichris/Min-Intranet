@@ -3,16 +3,32 @@ import { db } from './firebase'; // ou './lib/firebase' selon où est situé fir
 
 const STATE_DOC_REF = doc(db, 'intranet_data', 'main_state');
 
+function removeUndefined(obj: any): any {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefined);
+  }
+  const cleaned: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (val !== undefined) {
+      cleaned[key] = removeUndefined(val);
+    }
+  }
+  return cleaned;
+}
+
 export async function syncDataToFirestore(appState: any): Promise<void> {
   try {
-    // Strip heavy file blobs if any
-    const cleanState = {
+    const cleanState = removeUndefined({
       ...appState,
       updatedAt: new Date().toISOString(),
       documents: (appState.documents || []).map((d: any) => ({ ...d, fileUrl: undefined })),
       mails: (appState.mails || []).map((m: any) => ({ ...m, fileUrl: undefined })),
       contracts: (appState.contracts || []).map((c: any) => ({ ...c, fileUrl: undefined }))
-    };
+    });
     await setDoc(STATE_DOC_REF, cleanState, { merge: true });
     console.log('Données synchronisées avec succès sur Firebase Firestore.');
   } catch (err) {

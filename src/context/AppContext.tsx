@@ -104,22 +104,22 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // États React initialisés de manière neutre (mis à jour par Firestore)
-  const [users, setUsers] = useState<User[]>([]);
+  // Initialisation par défaut avec mockData si Firestore est vide
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('min_mmm_current_user');
-    return saved ? JSON.parse(saved) : null;
+    return saved ? JSON.parse(saved) : INITIAL_USERS[0] || null;
   });
-  const [services, setServices] = useState<Service[]>([]);
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [mails, setMails] = useState<Mail[]>([]);
-  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
-  const [cashSessions, setCashSessions] = useState<CashSession[]>([]);
-  const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [vaultItems, setVaultItems] = useState<VaultItem[]>([]);
-  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
-  const [userToolLinks, setUserToolLinks] = useState<UserToolLink[]>([]);
+  const [services, setServices] = useState<Service[]>(INITIAL_SERVICES);
+  const [contracts, setContracts] = useState<Contract[]>(INITIAL_CONTRACTS);
+  const [mails, setMails] = useState<Mail[]>(INITIAL_MAILS);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>(INITIAL_LEAVES);
+  const [cashSessions, setCashSessions] = useState<CashSession[]>(INITIAL_CASH_SESSIONS);
+  const [documents, setDocuments] = useState<DocumentItem[]>(INITIAL_DOCUMENTS);
+  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+  const [vaultItems, setVaultItems] = useState<VaultItem[]>(INITIAL_VAULT);
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>(INITIAL_EMERGENCY_CONTACTS);
+  const [userToolLinks, setUserToolLinks] = useState<UserToolLink[]>(INITIAL_USER_TOOL_LINKS);
   const [contractAlertDays, setContractAlertDays] = useState<number>(90);
   const [generalLabels, setGeneralLabels] = useState<GeneralLabels>({
     dashboard: {
@@ -163,30 +163,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     data: null,
   });
 
-  // 1. Chargement initial depuis Firestore
+  // 1. Chargement initial depuis Firestore avec Fallback sur MockData
   useEffect(() => {
     let isMounted = true;
     async function initFirestoreSync() {
       try {
         const cloudData = await fetchDataFromFirestore();
         if (cloudData && isMounted) {
-          if (cloudData.users) setUsers(cloudData.users);
-          if (cloudData.services) setServices(cloudData.services.map((s: any) => ({ ...s, subServices: s.subServices || [] })));
-          if (cloudData.contracts) setContracts(cloudData.contracts);
-          if (cloudData.mails) setMails(cloudData.mails);
-          if (cloudData.leaves) setLeaves(cloudData.leaves);
-          if (cloudData.cashSessions) setCashSessions(cloudData.cashSessions);
-          if (cloudData.documents) setDocuments(cloudData.documents);
-          if (cloudData.tasks) setTasks(cloudData.tasks);
-          if (cloudData.vaultItems) setVaultItems(cloudData.vaultItems);
-          if (cloudData.emergencyContacts) setEmergencyContacts(cloudData.emergencyContacts);
-          if (cloudData.userToolLinks) setUserToolLinks(cloudData.userToolLinks);
+          if (cloudData.users?.length) setUsers(cloudData.users);
+          if (cloudData.services?.length) setServices(cloudData.services.map((s: any) => ({ ...s, subServices: s.subServices || [] })));
+          if (cloudData.contracts?.length) setContracts(cloudData.contracts);
+          if (cloudData.mails?.length) setMails(cloudData.mails);
+          if (cloudData.leaves?.length) setLeaves(cloudData.leaves);
+          if (cloudData.cashSessions?.length) setCashSessions(cloudData.cashSessions);
+          if (cloudData.documents?.length) setDocuments(cloudData.documents);
+          if (cloudData.tasks?.length) setTasks(cloudData.tasks);
+          if (cloudData.vaultItems?.length) setVaultItems(cloudData.vaultItems);
+          if (cloudData.emergencyContacts?.length) setEmergencyContacts(cloudData.emergencyContacts);
+          if (cloudData.userToolLinks?.length) setUserToolLinks(cloudData.userToolLinks);
           if (cloudData.contractAlertDays) setContractAlertDays(cloudData.contractAlertDays);
           if (cloudData.generalLabels) setGeneralLabels(cloudData.generalLabels);
-          console.log('Base de données restaurée depuis Firestore avec succès.');
         }
       } catch (err) {
-        console.error('Erreur chargement Firestore au démarrage:', err);
+        console.error('Erreur chargement Firestore:', err);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -199,7 +198,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // 2. Synchronisation automatique des modifications vers Firestore (uniquement hors chargement)
+  // 2. Synchronisation automatique vers Firestore uniquement après chargement complet
   useEffect(() => {
     if (isLoading) return;
 
@@ -256,7 +255,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  // Maintien du cache local pour la session en cours
   useEffect(() => { if (!isLoading) safeSetItem('min_mmm_current_user', JSON.stringify(currentUser)); }, [currentUser, isLoading, safeSetItem]);
 
   const updateGeneralLabel = useCallback((key: keyof GeneralLabels, field: keyof GeneralModuleLabel, value: string) => {
@@ -715,7 +713,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           </svg>
         </div>
         <h2 className="text-xl font-bold">Chargement de l'Intranet MIN Marseille...</h2>
-        <p className="text-sm text-slate-500 mt-2">Synchronisation avec la base de données Firestore (Paris)...</p>
+        <p className="text-sm text-slate-500 mt-2">Synchronisation avec la base de données Firestore...</p>
       </div>
     );
   }
