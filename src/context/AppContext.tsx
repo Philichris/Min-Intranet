@@ -182,7 +182,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (cloudData.emergencyContacts?.length) setEmergencyContacts(cloudData.emergencyContacts);
           if (cloudData.userToolLinks?.length) setUserToolLinks(cloudData.userToolLinks);
           if (cloudData.contractAlertDays) setContractAlertDays(cloudData.contractAlertDays);
-          if (cloudData.generalLabels) setGeneralLabels(cloudData.generalLabels);
+          if (cloudData.generalLabels) {
+            setGeneralLabels(prev => ({
+              dashboard: { ...prev.dashboard, ...(cloudData.generalLabels.dashboard || {}) },
+              directory: { ...prev.directory, ...(cloudData.generalLabels.directory || {}) },
+              documents: { ...prev.documents, ...(cloudData.generalLabels.documents || {}) },
+              vault: { ...prev.vault, ...(cloudData.generalLabels.vault || {}) },
+              emergency: { ...prev.emergency, ...(cloudData.generalLabels.emergency || {}) },
+            }));
+          }
         }
       } catch (err) {
         console.error('Erreur chargement Firestore:', err);

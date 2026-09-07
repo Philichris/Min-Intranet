@@ -3,15 +3,26 @@ import { db } from './firebase';
 
 const COLLECTION = 'intranet_data';
 
-// Helper pour lire un document spécifique dans la collection
+// Helper pour convertir un objet indexé ("0", "1", ...) ou un tableau en tableau propre
+function normalizeArray(data: any): any[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'object') {
+    // Si c'est un objet enveloppé avec 'content'
+    if (data.content && Array.isArray(data.content)) return data.content;
+    if (data.content && typeof data.content === 'object') return Object.values(data.content);
+    // Sinon on extrait directement les valeurs de l'objet
+    return Object.values(data);
+  }
+  return [];
+}
+
 async function fetchDocData(docId: string): Promise<any> {
   try {
     const docRef = doc(db, COLLECTION, docId);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      const data = docSnap.data();
-      // Si le document contient un champ 'content', on le retourne, sinon on renvoie tout le document
-      return data.content !== undefined ? data.content : data;
+      return docSnap.data();
     }
   } catch (error) {
     console.error(`Erreur lecture ${docId}:`, error);
@@ -21,7 +32,6 @@ async function fetchDocData(docId: string): Promise<any> {
 
 export async function fetchDataFromFirestore(): Promise<any | null> {
   try {
-    // Lecture parallèle de tous tes documents
     const [
       usersData,
       servicesData,
@@ -52,28 +62,23 @@ export async function fetchDataFromFirestore(): Promise<any | null> {
       fetchDocData('min_mmm_general_labels')
     ]);
 
-    // Conversion en tableau pour les utilisateurs
-    let usersList = usersData;
-    if (usersList && !Array.isArray(usersList)) {
-      usersList = Object.values(usersList);
-    }
-
-    console.log("Utilisateurs chargés depuis Firestore :", usersList);
+    const usersList = normalizeArray(usersData);
+    console.log("Utilisateurs restaurés depuis Firebase :", usersList);
 
     return {
-      users: Array.isArray(usersList) ? usersList : [],
-      services: Array.isArray(servicesData) ? servicesData : (servicesData ? Object.values(servicesData) : []),
-      contracts: Array.isArray(contractsData) ? contractsData : [],
-      mails: Array.isArray(mailsData) ? mailsData : [],
-      leaves: Array.isArray(leavesData) ? leavesData : [],
-      cashSessions: Array.isArray(cashData) ? cashData : [],
-      documents: Array.isArray(docsData) ? docsData : [],
-      tasks: Array.isArray(tasksData) ? tasksData : [],
-      vaultItems: Array.isArray(vaultData) ? vaultData : [],
-      emergencyContacts: Array.isArray(emergencyData) ? emergencyData : [],
-      userToolLinks: Array.isArray(toolLinksData) ? toolLinksData : [],
-      contractAlertDays: typeof alertDaysData === 'number' ? alertDaysData : 90,
-      generalLabels: labelsData || null,
+      users: usersList,
+      services: normalizeArray(servicesData),
+      contracts: normalizeArray(contractsData),
+      mails: normalizeArray(mailsData),
+      leaves: normalizeArray(leavesData),
+      cashSessions: normalizeArray(cashData),
+      documents: normalizeArray(docsData),
+      tasks: normalizeArray(tasksData),
+      vaultItems: normalizeArray(vaultData),
+      emergencyContacts: normalizeArray(emergencyData),
+      userToolLinks: normalizeArray(toolLinksData),
+      contractAlertDays: typeof alertDaysData?.content === 'number' ? alertDaysData.content : 90,
+      generalLabels: labelsData?.content || labelsData || null,
     };
   } catch (error) {
     console.error("Erreur globale Firestore :", error);
@@ -106,6 +111,6 @@ export async function syncDataToFirestore(state: any): Promise<void> {
       save('min_mmm_general_labels', state.generalLabels || {})
     ]);
   } catch (error) {
-    console.error("Erreur lors de la sauvegarde Firestore :", error);
+    console.error("Erreur sauvegarde Firestore :", error);
   }
 }
