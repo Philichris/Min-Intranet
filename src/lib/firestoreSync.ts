@@ -1,22 +1,31 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
+// Nom exact du document principal stocké dans Firestore
 const DOCUMENT_ID = 'intranet_data';
 
 export async function fetchDataFromFirestore(): Promise<any | null> {
   try {
-    const docRef = doc(db, 'intranet_data', DOCUMENT_ID);
-    const docSnap = await getDoc(docRef);
+    // 1. Essai de lecture directe au niveau racine ou dans la collection intranet_data
+    let docRef = doc(db, 'intranet_data', DOCUMENT_ID);
+    let docSnap = await getDoc(docRef);
+
+    // Si non trouvé, on tente la lecture si intranet_data est une collection avec le doc (default)
+    if (!docSnap.exists()) {
+      docRef = doc(db, 'intranet_data', '(default)');
+      docSnap = await getDoc(docRef);
+    }
 
     if (docSnap.exists()) {
       const data = docSnap.data();
+      console.log("Données brutes Firestore récupérées :", data);
       
-      // On extrait la liste des utilisateurs enregistrés dans Firestore
-      // ou dans le document min_mmm_users si stocké sous forme de sous-clé
-      const usersData = data.min_mmm_users || data.users || [];
+      // Extraction des utilisateurs (supporte tableau ou objet de clés)
+      const rawUsers = data.min_mmm_users || data.users || [];
+      const usersList = Array.isArray(rawUsers) ? rawUsers : Object.values(rawUsers);
 
       return {
-        users: Array.isArray(usersData) ? usersData : Object.values(usersData),
+        users: usersList,
         services: data.min_mmm_services || data.services || [],
         contracts: data.min_mmm_contracts || data.contracts || [],
         mails: data.min_mmm_mails || data.mails || [],
@@ -31,7 +40,7 @@ export async function fetchDataFromFirestore(): Promise<any | null> {
         generalLabels: data.min_mmm_general_labels || null,
       };
     } else {
-      console.warn("Aucun document 'intranet_data' trouvé sur Firestore.");
+      console.warn("Aucun document trouvé sur Firestore aux emplacements 'intranet_data/intranet_data'.");
       return null;
     }
   } catch (error) {
@@ -48,7 +57,6 @@ export async function syncDataToFirestore(state: any): Promise<void> {
   try {
     const docRef = doc(db, 'intranet_data', DOCUMENT_ID);
     
-    // Conservation de la structure exacte mappée avec les clés Firebase
     const dataToSave = {
       min_mmm_users: state.users || [],
       min_mmm_services: state.services || [],
