@@ -187,6 +187,19 @@ export const INITIAL_SERVICES: Service[] = [
       { id: 'sub-loc-baux', serviceId: 'srv-locaux', name: 'Baux & Conventions d’Occupation', code: 'BAUX', description: 'Contrats de location et redevances domaniales' },
       { id: 'sub-loc-edl', serviceId: 'srv-locaux', name: 'États des Lieux & Sinistres', code: 'EDL', description: 'Constats d\'entrée/sortie et assurances bâtiments' }
     ]
+  },
+  {
+    id: 'srv-etudes',
+    name: 'Études & Rapports Stratégiques',
+    code: 'ETUDES',
+    description: 'Analyses prospectives, études d’impact, enquêtes de marché et rapports d’opportunité',
+    iconName: 'FolderKanban',
+    subServices: [
+      { id: 'sub-etude-marche', serviceId: 'srv-etudes', name: 'Études de Marché & Filières', code: 'MARCHE', description: 'Analyses sectorielles et flux agro-alimentaires' },
+      { id: 'sub-etude-impact', serviceId: 'srv-etudes', name: 'Études d’Impact & Environnement', code: 'IMPACT', description: 'Bilans carbone, mobilités et transition énergétique' },
+      { id: 'sub-etude-strat', serviceId: 'srv-etudes', name: 'Rapports Prospectifs & Stratégie', code: 'PROSPECT', description: 'Orientations stratégiques à 5 et 10 ans' },
+      { id: 'sub-etude-enquetes', serviceId: 'srv-etudes', name: 'Enquêtes & Retours Usagers', code: 'ENQUETES', description: 'Questionnaires de satisfaction et audits thématiques' }
+    ]
   }
 ];
 

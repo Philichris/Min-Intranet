@@ -92,6 +92,13 @@ export const Sidebar: React.FC = () => {
           activeClass: 'bg-emerald-50 text-emerald-800 border-l-4 border-emerald-600 shadow-2xs font-bold',
           badgeClass: 'bg-emerald-100 text-emerald-800'
         };
+      case 'ETUDES':
+        return {
+          icon: <FolderKanban className="h-4 w-4" />,
+          colorClass: 'text-violet-600',
+          activeClass: 'bg-violet-50 text-violet-800 border-l-4 border-violet-600 shadow-2xs font-bold',
+          badgeClass: 'bg-violet-100 text-violet-800'
+        };
       default:
         return {
           icon: <Building className="h-4 w-4" />,
