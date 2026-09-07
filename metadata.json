@@ -1,0 +1,8 @@
+{
+  "name": "Portail Intranet MIN-MMM",
+  "description": "Hub centralisé d'administration générale, outils métiers, documents, contrats et workflows de l'entreprise.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

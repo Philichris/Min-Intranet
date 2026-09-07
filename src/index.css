@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Brand Palette - MIN Marseille Méditerranée */
+    --color-min-navy: #002b49;
+    --color-min-sky: #0284c7;
+    --color-min-cyan: #06b6d4;
+    --color-min-lime: #84cc16;
+    --color-min-amber: #f59e0b;
+    --color-min-orange: #f97316;
+    --color-min-red: #ef4444;
+    --color-min-indigo: #4f46e5;
+    --color-min-slate: #0f172a;
+
+    /* Surface & Text */
+    --surface-bg: #f8fafc;
+    --surface-card: #ffffff;
+    --surface-muted: #f1f5f9;
+    --text-main: #0f172a;
+    --text-muted: #475569;
+    --text-subtle: #64748b;
+    --border-subtle: #e2e8f0;
+    --border-strong: #cbd5e1;
+  }
+
+  * {
+    border-color: var(--border-subtle);
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: var(--surface-bg);
+    color: var(--text-main);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Refined custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+}
+
+/* Custom interactive utility classes */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:ring-offset-2;
+}
+
+.min-spectrum-bar {
+  background: linear-gradient(
+    to right,
+    #84cc16 0%,
+    #84cc16 14.28%,
+    #0284c7 14.28%,
+    #0284c7 28.56%,
+    #a3e635 28.56%,
+    #a3e635 42.84%,
+    #ef4444 42.84%,
+    #ef4444 57.12%,
+    #f97316 57.12%,
+    #f97316 71.4%,
+    #eab308 71.4%,
+    #eab308 85.68%,
+    #06b6d4 85.68%,
+    #06b6d4 100%
+  );
+}
+
+
