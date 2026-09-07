@@ -222,6 +222,19 @@ export interface DocumentItem {
   ref?: string;
   fileUrl?: string;
   fileName?: string;
+  startDate?: string;
+  endDate?: string;
+  fournisseurName?: string;
+  objetContrat?: string;
+  clientName?: string;
+  numeroBox?: string;
+  site?: string;
+  dateMarche?: string;
+  nomMarche?: string;
+  contractStatus?: string;
+  decisionStatus?: string;
+  actionComment?: string;
+  actionDate?: string;
 }
 
 export interface Task {

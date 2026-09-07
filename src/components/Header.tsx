@@ -8,7 +8,7 @@ import {
 export const Header: React.FC = () => {
   const { 
     currentUser, logout, openModal, searchQuery, setSearchQuery, 
-    getFilteredUniversalResults, setActiveTab, setSelectedServiceId 
+    getFilteredUniversalResults, setActiveTab, setSelectedServiceId, setConsultingItem, consultDocument 
   } = useApp();
   
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
@@ -98,7 +98,7 @@ export const Header: React.FC = () => {
                       {searchResults.users.map(u => (
                         <div 
                           key={u.id}
-                          onClick={() => { setActiveTab('directory'); setSearchQuery(''); setShowSearchDropdown(false); }}
+                          onClick={() => { setConsultingItem({ type: 'user', id: u.id }); setActiveTab('directory'); setSearchQuery(''); setShowSearchDropdown(false); }}
                           className="flex cursor-pointer items-center justify-between rounded-lg p-2 hover:bg-slate-50 text-sm"
                         >
                           <span className="font-medium text-slate-800">{u.firstName} {u.lastName}</span>
@@ -116,11 +116,11 @@ export const Header: React.FC = () => {
                       {searchResults.contracts.map(c => (
                         <div 
                           key={c.id}
-                          onClick={() => { setActiveTab('contrats'); setSearchQuery(''); setShowSearchDropdown(false); }}
+                          onClick={() => { setConsultingItem({ type: 'contract', id: c.id }); setActiveTab('contrats'); setSearchQuery(''); setShowSearchDropdown(false); }}
                           className="flex cursor-pointer items-center justify-between rounded-lg p-2 hover:bg-slate-50 text-sm"
                         >
-                          <span className="font-medium text-slate-800">{c.name} ({c.raisonSociale})</span>
-                          <span className="text-xs font-medium text-slate-500">Échéance: {c.endDate}</span>
+                          <span className="font-medium text-slate-800">{c.title} ({c.fournisseurName || c.clientName || c.nomMarche || c.category})</span>
+                          <span className="text-xs font-medium text-slate-500">{c.endDate ? `Échéance: ${c.endDate}` : c.uploadDate ? `Date: ${c.uploadDate}` : ''}</span>
                         </div>
                       ))}
                     </div>
@@ -129,21 +129,41 @@ export const Header: React.FC = () => {
 
                 {searchResults.documents.length > 0 && (
                   <div>
-                    <h4 className="mb-1 text-xs font-bold text-slate-500 uppercase">Documents ({searchResults.documents.length})</h4>
+                    <h4 className="mb-1 text-xs font-bold text-slate-500 uppercase">Documents & Formulaires ({searchResults.documents.length})</h4>
                     <div className="space-y-1">
                       {searchResults.documents.map(d => (
                         <div 
                           key={d.id}
-                          onClick={() => { setActiveTab('documents'); setSearchQuery(''); setShowSearchDropdown(false); }}
+                          onClick={() => { consultDocument(d); setSearchQuery(''); setShowSearchDropdown(false); }}
                           className="flex cursor-pointer items-center justify-between rounded-lg p-2 hover:bg-slate-50 text-sm"
                         >
-                          <span className="font-medium text-slate-800">{d.title}</span>
-                          <span className="text-xs rounded bg-slate-100 px-1.5 py-0.5 text-slate-600">{d.category}</span>
+                          <span className="font-medium text-slate-800">{d.title} <span className="text-xs text-slate-400">({d.category || d.serviceId})</span></span>
+                          <span className="text-xs font-medium text-slate-500">{d.uploadDate || ''}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
+
+                {searchResults.services.length > 0 && (
+                  <div>
+                    <h4 className="mb-1 text-xs font-bold text-slate-500 uppercase">Services ({searchResults.services.length})</h4>
+                    <div className="space-y-1">
+                      {searchResults.services.map(s => (
+                        <div 
+                          key={s.id}
+                          onClick={() => { setActiveTab(s.code.toLowerCase()); setSearchQuery(''); setShowSearchDropdown(false); }}
+                          className="flex cursor-pointer items-center justify-between rounded-lg p-2 hover:bg-slate-50 text-sm"
+                        >
+                          <span className="font-medium text-slate-800">{s.name}</span>
+                          <span className="text-xs text-slate-500">Service MIN</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+
 
                 {searchResults.mails.length > 0 && (
                   <div>
@@ -152,7 +172,7 @@ export const Header: React.FC = () => {
                       {searchResults.mails.map(m => (
                         <div 
                           key={m.id}
-                          onClick={() => { setActiveTab('secretariat'); setSearchQuery(''); setShowSearchDropdown(false); }}
+                          onClick={() => { setConsultingItem({ type: 'mail', id: m.id }); setActiveTab('secretariat'); setSearchQuery(''); setShowSearchDropdown(false); }}
                           className="flex cursor-pointer items-center justify-between rounded-lg p-2 hover:bg-slate-50 text-sm"
                         >
                           <span className="font-medium text-slate-800">{m.subject}</span>

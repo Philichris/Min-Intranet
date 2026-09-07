@@ -117,14 +117,14 @@ export const INITIAL_SERVICES: Service[] = [
   },
   {
     id: 'srv-cont',
-    name: 'Gestion des Contrats (Fournisseurs &...)',
+    name: 'Gestion des Contrats',
     code: 'CONTRATS',
-    description: 'Registre centralisé fournisseurs et clients, avenants et alertes',
+    description: 'Fournisseurs, Clients et Marchés publics',
     iconName: 'ShieldCheck',
     subServices: [
-      { id: 'sub-reg_fourn', serviceId: 'srv-cont', name: 'Registre Contrats Fournisseurs', code: 'REG_FOURN', description: 'Contrats et avenants fournisseurs' },
-      { id: 'sub-reg_client', serviceId: 'srv-cont', name: 'Registre Contrats Clients', code: 'REG_CLIENT', description: 'Baux, concessions et redevances clients' },
-      { id: 'sub-alert_cont', serviceId: 'srv-cont', name: 'Alertes & Échéances', code: 'ALERT_CONT', description: 'Suivi des préavis et renouvellements' }
+      { id: 'fournisseurs', serviceId: 'srv-cont', name: 'Fournisseurs', code: 'FOURNISSEURS', description: 'Contrats et prestations fournisseurs' },
+      { id: 'clients', serviceId: 'srv-cont', name: 'Clients', code: 'CLIENTS', description: 'Baux, concessions et redevances clients' },
+      { id: 'marches_publics', serviceId: 'srv-cont', name: 'Marchés publics', code: 'MARCHES_PUBLICS', description: 'Marchés publics et appels d\'offres' }
     ]
   },
   {
@@ -250,16 +250,57 @@ export const INITIAL_DOCUMENTS: DocumentItem[] = [
   },
   {
     id: 'doc-con-1',
-    title: 'Contrat Maintenance Ponts Bascule 2026',
-    description: 'Prestations, maintenance et équipements.',
+    title: 'Maintenance ponts bascule',
+    description: 'Contrat de maintenance des ponts bascule du MIN.',
     serviceId: 'contrats',
-    category: 'contrats',
-    subCategory: '1. Contrats Fournisseurs',
+    category: 'fournisseurs',
+    subCategory: 'fournisseurs',
     uploadDate: '2026-01-10',
+    startDate: '2026-01-01',
+    endDate: '2026-09-18',
+    fournisseurName: 'Sermeca SAS',
+    objetContrat: 'Maintenance ponts bascule',
     authorName: 'Direction Technique',
-    fileSize: '2.4 MB',
-    fileType: 'pdf',
-    isPublic: true
+    fileSize: '2.4 Mo',
+    fileType: 'PDF',
+    isPublic: true,
+    ref: 'CTR-FO-01'
+  },
+  {
+    id: 'doc-con-2',
+    title: 'Bail Commercial - Grossiste Halle A',
+    description: 'Concession et redevances box Halle A.',
+    serviceId: 'contrats',
+    category: 'clients',
+    subCategory: 'clients',
+    uploadDate: '2026-02-01',
+    startDate: '2026-02-01',
+    endDate: '2026-09-22',
+    clientName: 'SARL Primeurs du Sud',
+    numeroBox: 'Box 12',
+    site: 'Halle A - Gros',
+    authorName: 'Service Commercial',
+    fileSize: '1.8 Mo',
+    fileType: 'PDF',
+    isPublic: true,
+    ref: 'CTR-CL-12'
+  },
+  {
+    id: 'doc-con-3',
+    title: 'Dossier Marché Nettoyage Voierie',
+    description: 'Marché public de propreté et voiries.',
+    serviceId: 'contrats',
+    category: 'marches_publics',
+    subCategory: 'marches_publics',
+    uploadDate: '2026-01-28',
+    dateMarche: '2026-01-28',
+    nomMarche: 'Nettoyage et propreté des voiries du MIN',
+    endDate: '2026-09-28',
+    authorName: 'Direction Juridique',
+    fileSize: '4.2 Mo',
+    fileType: 'PDF',
+    isPublic: true,
+    ref: 'MP-2026-01'
   }
 ];
 

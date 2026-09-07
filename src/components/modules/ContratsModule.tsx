@@ -12,13 +12,13 @@ interface CategoryTab {
 }
 
 export const ContratsModule: React.FC = () => {
-  const { services, currentUser, contractAlertDays, addSubService, updateSubService, deleteSubService, openModal, documents, uploadDocument, updateDocument, deleteDocument } = useApp();
+  const { services, currentUser, contractAlertDays, addSubService, updateSubService, deleteSubService, openModal, documents, uploadDocument, updateDocument, deleteDocument, consultingItem, setConsultingItem, consultDocument } = useApp();
   const isAdmin = currentUser.role === 'admin';
   const canManage = currentUser.role === 'admin' || currentUser.role === 'manager';
 
   const serviceObj = services.find(s => s.code === 'CONTRATS');
-  const serviceTitle = serviceObj ? serviceObj.name : 'Gestion des Contrats & Avenants';
-  const serviceDesc = serviceObj ? serviceObj.description : `Alertes à ${contractAlertDays} jours, rubriques paramétrables et traçabilité historique.`;
+  const serviceTitle = serviceObj ? serviceObj.name : 'Gestion des Contrats';
+  const serviceDesc = serviceObj ? serviceObj.description : `Fournisseurs, Clients et Marchés publics.`;
 
   const categories: CategoryTab[] = (serviceObj?.subServices && serviceObj.subServices.length > 0)
     ? serviceObj.subServices.map((sub, idx) => ({
@@ -29,7 +29,9 @@ export const ContratsModule: React.FC = () => {
         iconName: idx === 1 ? 'FileText' : 'ShieldCheck'
       }))
     : [
-        { id: 'fournisseurs', name: 'Contrats Fournisseurs', label: '1. Contrats Fournisseurs', desc: 'Prestations, maintenance et équipements', iconName: 'ShieldCheck' },
+        { id: 'fournisseurs', name: 'Fournisseurs', label: '1. Fournisseurs', desc: 'Prestations, maintenance et équipements', iconName: 'ShieldCheck' },
+        { id: 'clients', name: 'Clients', label: '2. Clients', desc: 'Baux, concessions et redevances clients', iconName: 'FileText' },
+        { id: 'marches_publics', name: 'Marchés publics', label: '3. Marchés publics', desc: 'Marchés publics et appels d’offres', iconName: 'ShieldCheck' }
       ];
 
   const [activeTab, setActiveTab] = useState<string>(categories[0]?.id || 'fournisseurs');
@@ -53,6 +55,17 @@ export const ContratsModule: React.FC = () => {
   const [targetCategory, setTargetCategory] = useState(activeTab);
   const [newSubFolder, setNewSubFolder] = useState('');
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
+
+  // Specific fields for métiers
+  const [fournisseurName, setFournisseurName] = useState('');
+  const [objetContrat, setObjetContrat] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [numeroBox, setNumeroBox] = useState('');
+  const [site, setSite] = useState('');
+  const [dateMarche, setDateMarche] = useState(new Date().toISOString().split('T')[0]);
+  const [nomMarche, setNomMarche] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const currentCategory = categories.find(c => c.id === activeTab) || categories[0];
   const effectiveCat = currentCategory ? currentCategory.id : categories[0].id;
@@ -93,19 +106,19 @@ export const ContratsModule: React.FC = () => {
 
   const serviceKey = 'contrats';
   const serviceDocs = documents.filter(doc => {
-    const matchService = doc.serviceId?.toLowerCase() === serviceKey.toLowerCase() || doc.category?.toLowerCase() === serviceKey.toLowerCase();
+    const matchService = doc.serviceId?.toLowerCase() === serviceKey.toLowerCase() || doc.category?.toLowerCase() === serviceKey.toLowerCase() || doc.serviceId?.toLowerCase() === 'srv-cont';
     return matchService;
   });
 
   const defaultContractDocs: Record<string, Array<any>> = {
     fournisseurs: [
-      { id: 'con-1', title: 'Contrat Maintenance Ponts Bascule 2026', category: 'fournisseurs', date: '2026-01-10', size: '2.4 Mo', type: 'PDF', ref: 'CTR-FO-01', uploader: 'Direction Technique' }
+      { id: 'con-1', title: 'Maintenance ponts bascule', category: 'fournisseurs', date: '2026-01-10', size: '2.4 Mo', type: 'PDF', ref: 'CTR-FO-01', uploader: 'Direction Technique', fournisseurName: 'Sermeca SAS', objetContrat: 'Maintenance ponts bascule', startDate: '2026-01-01', endDate: '2026-12-31' }
     ],
     clients: [
-      { id: 'con-2', title: 'Bail Commercial Grossiste Halle A - Box 12', category: 'clients', date: '2026-02-01', size: '1.8 Mo', type: 'PDF', ref: 'CTR-CL-12', uploader: 'Service Commercial' }
+      { id: 'con-2', title: 'Bail Commercial - Grossiste Halle A', category: 'clients', date: '2026-02-01', size: '1.8 Mo', type: 'PDF', ref: 'CTR-CL-12', uploader: 'Service Commercial', clientName: 'SARL Primeurs du Sud', numeroBox: 'Box 12', site: 'Halle A - Gros', startDate: '2026-02-01', endDate: '2029-01-31' }
     ],
-    dsp: [
-      { id: 'con-3', title: 'Avenant n°2 Convention DSP Gestion MIN', category: 'dsp', date: '2026-01-28', size: '4.2 Mo', type: 'PDF', ref: 'DSP-2026-A2', uploader: 'Direction Juridique' }
+    marches_publics: [
+      { id: 'con-3', title: 'Dossier Marché Nettoyage Voierie', category: 'marches_publics', date: '2026-01-28', size: '4.2 Mo', type: 'PDF', ref: 'MP-2026-01', uploader: 'Direction Juridique', dateMarche: '2026-01-28', nomMarche: 'Nettoyage et propreté des voiries du MIN', endDate: '2028-12-31' }
     ]
   };
 
@@ -114,33 +127,77 @@ export const ContratsModule: React.FC = () => {
     title: d.title,
     category: d.subCategory || d.category || effectiveCat,
     subFolder: d.subFolder || '',
-    date: d.uploadDate || new Date().toISOString().split('T')[0],
+    date: d.uploadDate || (d as any).dateMarche || new Date().toISOString().split('T')[0],
     size: d.fileSize || '2.0 Mo',
     type: d.fileType || 'PDF',
     ref: d.ref || 'REF-' + d.id.slice(-4),
     uploader: d.authorName || 'Direction Juridique',
     fileUrl: d.fileUrl,
-    fileName: d.fileName
+    fileName: d.fileName,
+    fournisseurName: (d as any).fournisseurName,
+    objetContrat: (d as any).objetContrat,
+    clientName: (d as any).clientName,
+    numeroBox: (d as any).numeroBox,
+    site: (d as any).site,
+    dateMarche: (d as any).dateMarche,
+    nomMarche: (d as any).nomMarche,
+    startDate: (d as any).startDate,
+    endDate: (d as any).endDate
   }));
 
   const tabSubFolders = subFolders.filter(sf => sf.categoryId === effectiveCat);
   const tabDefaults = defaultContractDocs[effectiveCat] || [];
   const allTabContracts = [...globalMappedContracts.filter(c => c.category === effectiveCat || c.category === currentCategory?.label), ...tabDefaults.filter(td => !globalMappedContracts.some(gd => gd.id === td.id))];
 
+  useEffect(() => {
+    if (consultingItem && consultingItem.type === 'contract') {
+      const allDocs = documents.filter(d => d.serviceId?.toLowerCase() === 'contrats' || d.serviceId?.toLowerCase() === 'srv-cont' || d.category === 'fournisseurs' || d.category === 'clients' || d.category === 'marches_publics');
+      const found = allDocs.find(item => item.id === consultingItem.id);
+      if (found) {
+        const cat = found.category || 'fournisseurs';
+        if (cat !== activeTab) {
+          setActiveTab(cat);
+        } else {
+          const mapped = {
+            id: found.id,
+            title: found.title,
+            category: found.subCategory || found.category || cat,
+            subFolder: found.subFolder || '',
+            date: found.uploadDate || (found as any).dateMarche || new Date().toISOString().split('T')[0],
+            size: found.fileSize || '2.0 Mo',
+            type: found.fileType || 'PDF',
+            ref: found.ref || 'REF-' + found.id.slice(-4),
+            uploader: found.authorName || 'Direction Juridique',
+            fileUrl: found.fileUrl,
+            fileName: found.fileName
+          };
+          handleConsult(mapped);
+          setConsultingItem(null);
+        }
+      }
+    }
+  }, [consultingItem, documents, activeTab]);
+
   const filteredContracts = allTabContracts.filter(c => {
-    const matchesQ = `${c.title} ${c.ref} ${c.uploader} ${c.subFolder}`.toLowerCase().includes(filterQuery.toLowerCase());
+    const matchesQ = `${c.title} ${c.ref} ${c.uploader} ${c.subFolder} ${(c as any).fournisseurName || ''} ${(c as any).clientName || ''} ${(c as any).nomMarche || ''}`.toLowerCase().includes(filterQuery.toLowerCase());
     const matchesSubFolder = selectedSubFolder === 'all' || c.subFolder === selectedSubFolder;
     return matchesQ && matchesSubFolder;
   });
 
   const handleAddContract = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) {
-      alert('Veuillez saisir un intitulé pour le contrat.');
+    const destCat = targetCategory || effectiveCat;
+    
+    let titleToSave = newTitle;
+    if (destCat === 'fournisseurs') titleToSave = objetContrat || fournisseurName || 'Contrat Fournisseur';
+    if (destCat === 'clients') titleToSave = `Bail / Contrat - ${clientName || 'Client'} (${site || 'Box ' + numeroBox})`;
+    if (destCat === 'marches_publics') titleToSave = newTitle || nomMarche || 'Marché public';
+
+    if (!titleToSave.trim()) {
+      alert('Veuillez remplir les champs obligatoires.');
       return;
     }
 
-    const destCat = targetCategory || effectiveCat;
     const kb = attachedFile ? Math.round(attachedFile.size / 1024) : 2000;
     const fileSize = kb > 1024 ? (kb / 1024).toFixed(1) + ' Mo' : kb + ' Ko';
     const parts = attachedFile ? attachedFile.name.split('.') : [];
@@ -148,13 +205,22 @@ export const ContratsModule: React.FC = () => {
 
     try {
       await uploadDocument({
-        title: newTitle,
+        title: titleToSave,
         category: destCat,
         subCategory: destCat,
         subFolder: newSubFolder || undefined,
         serviceId: 'contrats',
         authorName: `${currentUser.firstName} ${currentUser.lastName}`,
-        uploadDate: newDate || new Date().toISOString().split('T')[0],
+        uploadDate: newDate || dateMarche || new Date().toISOString().split('T')[0],
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        fournisseurName: destCat === 'fournisseurs' ? fournisseurName : undefined,
+        objetContrat: destCat === 'fournisseurs' ? objetContrat : undefined,
+        clientName: destCat === 'clients' ? clientName : undefined,
+        numeroBox: destCat === 'clients' ? numeroBox : undefined,
+        site: destCat === 'clients' ? site : undefined,
+        dateMarche: destCat === 'marches_publics' ? dateMarche : undefined,
+        nomMarche: destCat === 'marches_publics' ? nomMarche : undefined,
         fileSize,
         fileType,
         isPublic: true,
@@ -170,10 +236,80 @@ export const ContratsModule: React.FC = () => {
     }
   };
 
+  const handleOpenEditContract = (c: any) => {
+    setEditingDoc(c);
+    setTargetCategory(c.category || effectiveCat);
+    setNewTitle(c.title || '');
+    setNewRef(c.ref || '');
+    setNewDate(c.date || new Date().toISOString().split('T')[0]);
+    setNewSubFolder(c.subFolder || '');
+    setFournisseurName(c.fournisseurName || '');
+    setObjetContrat(c.objetContrat || '');
+    setClientName(c.clientName || '');
+    setNumeroBox(c.numeroBox || '');
+    setSite(c.site || '');
+    setDateMarche(c.dateMarche || c.date || new Date().toISOString().split('T')[0]);
+    setNomMarche(c.nomMarche || '');
+    setStartDate(c.startDate || '');
+    setEndDate(c.endDate || '');
+    setAttachedFile(null);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateContract = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDoc) return;
+    const destCat = targetCategory || effectiveCat;
+    
+    let titleToSave = newTitle;
+    if (destCat === 'fournisseurs') titleToSave = objetContrat || fournisseurName || 'Contrat Fournisseur';
+    if (destCat === 'clients') titleToSave = `Bail / Contrat - ${clientName || 'Client'} (${site || 'Box ' + numeroBox})`;
+    if (destCat === 'marches_publics') titleToSave = newTitle || nomMarche || 'Marché public';
+
+    try {
+      await updateDocument({
+        ...editingDoc,
+        title: titleToSave,
+        category: destCat,
+        subCategory: destCat,
+        subFolder: newSubFolder || undefined,
+        uploadDate: newDate || dateMarche || editingDoc.date,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        fournisseurName: destCat === 'fournisseurs' ? fournisseurName : undefined,
+        objetContrat: destCat === 'fournisseurs' ? objetContrat : undefined,
+        clientName: destCat === 'clients' ? clientName : undefined,
+        numeroBox: destCat === 'clients' ? numeroBox : undefined,
+        site: destCat === 'clients' ? site : undefined,
+        dateMarche: destCat === 'marches_publics' ? dateMarche : undefined,
+        nomMarche: destCat === 'marches_publics' ? nomMarche : undefined,
+        ref: newRef || editingDoc.ref,
+        fileName: attachedFile ? attachedFile.name : editingDoc.fileName
+      }, attachedFile || undefined);
+
+      setShowEditModal(false);
+      setEditingDoc(null);
+      resetForm();
+      alert('Contrat mis à jour avec succès.');
+    } catch (err) {
+      console.error('Error updating contract:', err);
+      alert('Erreur lors de la mise à jour du contrat.');
+    }
+  };
+
   const resetForm = () => {
     setNewTitle('');
     setNewRef('');
     setNewDate(new Date().toISOString().split('T')[0]);
+    setFournisseurName('');
+    setObjetContrat('');
+    setClientName('');
+    setNumeroBox('');
+    setSite('');
+    setDateMarche(new Date().toISOString().split('T')[0]);
+    setNomMarche('');
+    setStartDate('');
+    setEndDate('');
     setNewSubFolder('');
     setAttachedFile(null);
     setShowAddModal(false);
@@ -186,48 +322,8 @@ export const ContratsModule: React.FC = () => {
     }
   };
 
-  const handleConsult = async (doc: { id?: string; title: string; ref: string; date: string; size: string; type: string; fileUrl?: string; fileName?: string }) => {
-    let fileUrl = doc.fileUrl;
-    if (!fileUrl && doc.id) {
-      fileUrl = await getFileFromIDB(doc.id);
-    }
-    if (fileUrl) {
-      const win = window.open('', '_blank');
-      if (win) {
-        win.document.write(`
-          <html>
-            <head>
-              <title>Consultation - ${doc.title}</title>
-              <style>
-                body { font-family: system-ui, sans-serif; padding: 30px; background: #0f172a; color: #f8fafc; text-align: center; }
-                .container { max-width: 800px; margin: 0 auto; background: #1e293b; padding: 32px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-                h1 { font-size: 18px; margin-bottom: 8px; }
-                p { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
-                iframe { width: 100%; height: 500px; border: none; border-radius: 8px; background: white; margin-top: 16px; }
-                .actions { margin-top: 20px; display: flex; justify-content: center; gap: 12px; }
-                a, button { background: #0284c7; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 13px; border: none; cursor: pointer; }
-                a:hover, button:hover { background: #0284c7; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <h1>${doc.title}</h1>
-                <p>Réf: ${doc.ref} • Ajouté le ${doc.date} • ${doc.size}</p>
-                <iframe src="${fileUrl}" title="${doc.title}"></iframe>
-                <div class="actions">
-                  <a href="${fileUrl}" download="${doc.fileName || 'contrat'}">Télécharger le fichier</a>
-                  <button onclick="window.print()">Imprimer</button>
-                </div>
-              </div>
-            </body>
-          </html>
-        `);
-        win.document.close();
-        return;
-      }
-    } else {
-      alert("Aucun fichier associé ou fichier introuvable dans IndexedDB pour ce contrat.");
-    }
+  const handleConsult = async (doc: any) => {
+    await consultDocument(doc);
   };
 
   const handleOpenEditCategory = (cat: CategoryTab, e: React.MouseEvent) => {
@@ -450,13 +546,22 @@ export const ContratsModule: React.FC = () => {
                     <span>Consulter</span>
                   </button>
                   {canManage && (
-                    <button
-                      onClick={() => handleDelete(c.id)}
-                      className="rounded-xl bg-rose-50 p-2 text-rose-600 hover:bg-rose-100 transition-colors"
-                      title="Supprimer"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handleOpenEditContract(c)}
+                        className="rounded-xl bg-slate-100 p-2 text-slate-700 hover:bg-slate-200 transition-colors"
+                        title="Modifier"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(c.id)}
+                        className="rounded-xl bg-rose-50 p-2 text-rose-600 hover:bg-rose-100 transition-colors"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -499,43 +604,174 @@ export const ContratsModule: React.FC = () => {
                   ))}
                 </select>
               </div>
+              {/* Fournisseurs Fields */}
+              {targetCategory === 'fournisseurs' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Date</label>
+                    <input
+                      type="date"
+                      value={newDate}
+                      onChange={(e) => setNewDate(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Nom Fournisseur</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Sermeca SAS"
+                      value={fournisseurName}
+                      onChange={(e) => setFournisseurName(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Objet du Contrat</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Maintenance ponts bascule"
+                      value={objetContrat}
+                      onChange={(e) => setObjetContrat(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Date Début</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Date de Fin</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Clients Fields */}
+              {targetCategory === 'clients' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Nom Client</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: SARL Primeurs du Sud"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Numéro de Box</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Box 12"
+                        value={numeroBox}
+                        onChange={(e) => setNumeroBox(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Site / Halle</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Halle A - Gros"
+                        value={site}
+                        onChange={(e) => setSite(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Date Début Contrat</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Date de Fin Contrat</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Marchés Publics Fields */}
+              {targetCategory === 'marches_publics' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Date du Marché</label>
+                    <input
+                      type="date"
+                      value={dateMarche}
+                      onChange={(e) => setDateMarche(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Nom du Document</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Acte d'engagement / Cahier des charges"
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Nom du Marché</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Nettoyage et propreté des voiries du MIN"
+                      value={nomMarche}
+                      onChange={(e) => setNomMarche(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Date de Fin</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                    />
+                  </div>
+                </>
+              )}
+
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Intitulé du Contrat</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Contrat de prestation sécurité Hall B"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Date</label>
-                  <input
-                    type="date"
-                    value={newDate}
-                    onChange={(e) => setNewDate(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Référence</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: CTR-2026"
-                    value={newRef}
-                    onChange={(e) => setNewRef(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Pièce jointe</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Pièce jointe (Consultable)</label>
                 <label className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 cursor-pointer text-xs font-medium text-slate-600">
-                  <span>{attachedFile ? attachedFile.name : "Sélectionner un fichier..."}</span>
+                  <span>{attachedFile ? attachedFile.name : "Sélectionner un fichier (PDF, Word)..."}</span>
                   <input
                     type="file"
                     className="hidden"
@@ -615,6 +851,217 @@ export const ContratsModule: React.FC = () => {
               <div className="pt-4 flex justify-end gap-3 border-t border-slate-200">
                 <button type="button" onClick={() => setShowCategoryModal(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold">Annuler</button>
                 <button type="submit" className="rounded-xl bg-slate-900 text-white px-5 py-2 text-xs font-bold hover:bg-slate-800 shadow-md">Enregistrer</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onClick={() => setShowEditModal(false)} className="absolute right-5 top-5 p-2 text-slate-400 hover:bg-slate-100 rounded-full">
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Modifier le Contrat / Document</h3>
+            <form onSubmit={handleUpdateContract} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Rubrique</label>
+                <select
+                  value={targetCategory}
+                  onChange={(e) => setTargetCategory(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-900"
+                >
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Sous-dossier / Affaire</label>
+                <select
+                  value={newSubFolder}
+                  onChange={(e) => setNewSubFolder(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-900"
+                >
+                  <option value="">-- Aucun sous-dossier (Racine) --</option>
+                  {subFolders.filter(sf => sf.categoryId === targetCategory).map(sf => (
+                    <option key={sf.id} value={sf.name}>📂 {sf.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Fournisseurs Fields */}
+              {targetCategory === 'fournisseurs' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Date</label>
+                    <input
+                      type="date"
+                      value={newDate}
+                      onChange={(e) => setNewDate(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Nom Fournisseur</label>
+                    <input
+                      type="text"
+                      value={fournisseurName}
+                      onChange={(e) => setFournisseurName(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Objet du Contrat</label>
+                    <input
+                      type="text"
+                      value={objetContrat}
+                      onChange={(e) => setObjetContrat(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Date Début</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Date de Fin</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Clients Fields */}
+              {targetCategory === 'clients' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Nom Client</label>
+                    <input
+                      type="text"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Numéro de Box</label>
+                      <input
+                        type="text"
+                        value={numeroBox}
+                        onChange={(e) => setNumeroBox(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Site / Halle</label>
+                      <input
+                        type="text"
+                        value={site}
+                        onChange={(e) => setSite(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Date Début</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Date de Fin</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Marchés Publics Fields */}
+              {targetCategory === 'marches_publics' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Date du Marché</label>
+                    <input
+                      type="date"
+                      value={dateMarche}
+                      onChange={(e) => setDateMarche(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Nom du Document</label>
+                    <input
+                      type="text"
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Nom du Marché</label>
+                    <input
+                      type="text"
+                      value={nomMarche}
+                      onChange={(e) => setNomMarche(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Date de Fin</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      required
+                    />
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Remplacer la Pièce Jointe (Optionnel)</label>
+                <input
+                  type="file"
+                  onChange={(e) => setAttachedFile(e.target.files ? e.target.files[0] : null)}
+                  className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100"
+                />
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-slate-200">
+                <button type="button" onClick={() => setShowEditModal(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold">Annuler</button>
+                <button type="submit" className="rounded-xl bg-sky-600 text-white px-5 py-2 text-xs font-bold hover:bg-sky-500 shadow-md">Enregistrer les modifications</button>
               </div>
             </form>
           </div>

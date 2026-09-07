@@ -12,7 +12,6 @@ import { FinanceModule } from './components/modules/FinanceModule';
 import { ContratsModule } from './components/modules/ContratsModule';
 import { JuridiqueModule } from './components/modules/JuridiqueModule';
 import { SecretariatModule } from './components/modules/SecretariatModule';
-import { DocumentsModule } from './components/modules/DocumentsModule';
 import { AdminModule } from './components/modules/AdminModule';
 import { VaultModule } from './components/modules/VaultModule';
 import { EmergencyModule } from './components/modules/EmergencyModule';
@@ -34,7 +33,6 @@ const MainContent: React.FC = () => {
     switch (activeTab) {
       case 'dashboard': return <Dashboard />;
       case 'directory': return <DirectoryModule />;
-      case 'documents': return <DocumentsModule />;
       case 'vault': return <VaultModule />;
       case 'emergency': return <EmergencyModule />;
       case 'expl': return <ExploitationModule />;

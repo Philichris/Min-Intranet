@@ -8,12 +8,16 @@ import {
 
 export const Dashboard: React.FC = () => {
   const { 
-    currentUser, tasks, mails, leaves, contracts, services, userToolLinks, setActiveTab, openModal, generalLabels, contractAlertDays 
+    currentUser, tasks, mails, leaves, contracts, services, userToolLinks, setActiveTab, openModal, generalLabels, contractAlertDays, documents, updateDocument, setConsultingItem 
   } = useApp();
 
   const isAdmin = currentUser.role === 'admin';
   const isManager = currentUser.role === 'manager' || isAdmin;
   const canContrats = isAdmin || isManager || currentUser.permissions?.some(p => p.includes('cont') || p.includes('dsp') || p.includes('sub-alert_cont'));
+
+  const [selectedAlertContract, setSelectedAlertContract] = React.useState<any | null>(null);
+  const [decisionAction, setDecisionAction] = React.useState<'renouvelé' | 'résilié' | 'autre'>('renouvelé');
+  const [decisionComment, setDecisionComment] = React.useState('');
 
   const userHasAccessToService = (serviceId: string) => {
     if (isAdmin) return true;
@@ -29,12 +33,53 @@ export const Dashboard: React.FC = () => {
   const pendingLeaves = isManager ? leaves.filter(l => l.status === 'En attente' && (isAdmin || l.serviceId === currentUser.serviceId)) : [];
   
   const now = new Date().getTime();
-  const imminentContracts = canContrats ? contracts.filter(c => {
-    if (!userHasAccessToService(c.serviceId)) return false;
-    const endTimestamp = new Date(c.endDate).getTime();
+  const imminentContracts = canContrats ? documents.filter(doc => {
+    const isContract = doc.serviceId?.toLowerCase() === 'contrats' || doc.serviceId?.toLowerCase() === 'srv-cont' || doc.category === 'fournisseurs' || doc.category === 'clients' || doc.category === 'marches_publics';
+    if (!isContract) return false;
+    if (!doc.endDate) return false;
+    if (doc.contractStatus && doc.contractStatus !== 'actif') return false;
+
+    const endTimestamp = new Date(doc.endDate).getTime();
     const daysRemaining = Math.ceil((endTimestamp - now) / (1000 * 3600 * 24));
-    return daysRemaining <= contractAlertDays && c.decisionStatus !== 'Renouvellement validé' && c.decisionStatus !== 'Résiliation / Pas de nouveau contrat';
+    return daysRemaining <= contractAlertDays;
   }) : [];
+
+  const fournisseursAlerts = imminentContracts.filter(c => c.category === 'fournisseurs' || c.subCategory === 'fournisseurs');
+  const clientsAlerts = imminentContracts.filter(c => c.category === 'clients' || c.subCategory === 'clients');
+  const marchesAlerts = imminentContracts.filter(c => c.category === 'marches_publics' || c.subCategory === 'marches_publics');
+
+  const renderContractAlertItem = (contract: any) => {
+    const isRed = contract.statusColor === 'rouge';
+    return (
+      <div key={contract.id} className={`flex items-center justify-between rounded-2xl border p-3.5 transition-colors ${isRed ? 'border-rose-200 bg-rose-50/40' : 'border-amber-200 bg-amber-50/40'}`}>
+        <div 
+          onClick={() => {
+            setConsultingItem({ type: 'contract', id: contract.id });
+            setActiveTab('contrats');
+          }}
+          className="flex items-start gap-3 cursor-pointer flex-1 group"
+          title="Cliquer pour ouvrir le document"
+        >
+          <div className={`mt-0.5 rounded-lg p-1.5 ${isRed ? 'bg-rose-200 text-rose-800' : 'bg-amber-200 text-amber-800'}`}>
+            <AlertCircle className="h-4 w-4" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-slate-900 group-hover:text-sky-600 transition-colors flex items-center gap-1">
+              {contract.title || contract.name}
+              <ExternalLink className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+            </h4>
+            <p className="text-[11px] text-slate-600">{contract.fournisseurName || contract.clientName || contract.nomMarche || 'Contrat'} • Échéance: {contract.endDate}</p>
+          </div>
+        </div>
+        <button 
+          onClick={() => setSelectedAlertContract(contract)}
+          className={`rounded-lg px-3 py-1 text-[11px] font-semibold shadow-sm text-white ${isRed ? 'bg-rose-600 hover:bg-rose-500' : 'bg-amber-600 hover:bg-amber-500'}`}
+        >
+          Décider
+        </button>
+      </div>
+    );
+  };
 
   const myToolLinks = userToolLinks.filter(l => {
     const ids = l.userIds || [(l as any).userId || 'global'];
@@ -264,32 +309,41 @@ export const Dashboard: React.FC = () => {
                 </span>
               </div>
 
-              <div className="space-y-3 mt-4">
+              <div className="space-y-4 mt-4">
                 {imminentContracts.length === 0 ? (
                   <p className="text-xs text-slate-500 py-6 text-center">Aucun contrat imminent dans le délai paramétré pour vos services.</p>
                 ) : (
-                  imminentContracts.map(contract => {
-                    const isRed = contract.statusColor === 'rouge';
-                    return (
-                      <div key={contract.id} className={`flex items-center justify-between rounded-2xl border p-3.5 transition-colors ${isRed ? 'border-rose-200 bg-rose-50/40' : 'border-amber-200 bg-amber-50/40'}`}>
-                        <div className="flex items-start gap-3">
-                          <div className={`mt-0.5 rounded-lg p-1.5 ${isRed ? 'bg-rose-200 text-rose-800' : 'bg-amber-200 text-amber-800'}`}>
-                            <AlertCircle className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-bold text-slate-900">{contract.name}</h4>
-                            <p className="text-[11px] text-slate-600">{contract.raisonSociale} • Échéance: {contract.endDate}</p>
-                          </div>
-                        </div>
-                        <button 
-                          onClick={() => setActiveTab('contrats')}
-                          className={`rounded-lg px-3 py-1 text-[11px] font-semibold shadow-sm text-white ${isRed ? 'bg-rose-600 hover:bg-rose-500' : 'bg-amber-600 hover:bg-amber-500'}`}
-                        >
-                          Décider
-                        </button>
+                  <div className="space-y-4">
+                    {fournisseursAlerts.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-rose-500"></span>
+                          Contrats Fournisseurs ({fournisseursAlerts.length})
+                        </h4>
+                        {fournisseursAlerts.map(contract => renderContractAlertItem(contract))}
                       </div>
-                    );
-                  })
+                    )}
+
+                    {clientsAlerts.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                          Baux & Contrats Clients ({clientsAlerts.length})
+                        </h4>
+                        {clientsAlerts.map(contract => renderContractAlertItem(contract))}
+                      </div>
+                    )}
+
+                    {marchesAlerts.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-indigo-500"></span>
+                          Marchés Publics ({marchesAlerts.length})
+                        </h4>
+                        {marchesAlerts.map(contract => renderContractAlertItem(contract))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -307,6 +361,84 @@ export const Dashboard: React.FC = () => {
         )}
 
       </div>
+
+      {/* Decision Modal for Contract Alert */}
+      {selectedAlertContract && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl relative">
+            <button onClick={() => setSelectedAlertContract(null)} className="absolute right-5 top-5 p-2 text-slate-400 hover:bg-slate-100 rounded-full">
+              ✕
+            </button>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Traiter l'Alerte Contrat</h3>
+            <p className="text-xs text-slate-500 mb-4">{selectedAlertContract.title || selectedAlertContract.name} (Échéance: {selectedAlertContract.endDate})</p>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const statusMap = {
+                'renouvelé': 'Renouvellement validé',
+                'résilié': 'Résiliation / Pas de nouveau contrat',
+                'autre': 'Autre action'
+              };
+              try {
+                await updateDocument({
+                  ...selectedAlertContract,
+                  contractStatus: decisionAction,
+                  decisionStatus: statusMap[decisionAction],
+                  actionComment: decisionComment,
+                  actionDate: new Date().toISOString().split('T')[0]
+                });
+                setSelectedAlertContract(null);
+                setDecisionComment('');
+                alert('Action enregistrée. L’alerte a été traitée et a disparu du tableau de bord.');
+              } catch (err) {
+                console.error(err);
+                alert('Erreur lors de la sauvegarde.');
+              }
+            }} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Action à effectuer</label>
+                <select
+                  value={decisionAction}
+                  onChange={(e: any) => setDecisionAction(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-900"
+                >
+                  <option value="renouvelé">Renouveler le contrat</option>
+                  <option value="résilié">Résilier le contrat</option>
+                  <option value="autre">Autre action</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Commentaire / Notes</label>
+                <textarea
+                  rows={3}
+                  placeholder="Précisez les modalités de renouvellement, résiliation ou autre action..."
+                  value={decisionComment}
+                  onChange={(e) => setDecisionComment(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedAlertContract(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/30"
+                >
+                  Valider & Traiter l'alerte
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

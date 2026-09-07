@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Users, Building, Plus, Trash2, Edit2, Shield, Check, X, Briefcase, Bell, Wrench, ArrowUp, ArrowDown, Download, Upload } from 'lucide-react';
+import { Users, Building, Plus, Trash2, Edit2, Shield, Check, X, Briefcase, Bell, Wrench, ArrowUp, ArrowDown, Download, Upload, Cloud, RefreshCw } from 'lucide-react';
 import { User, Service, Role, SubService, GeneralLabels, UserToolLink } from '../../types';
 import { getFileFromIDB, saveFileToIDB, testIndexedDB } from '../../utils/idbStorage';
+import { syncDataToFirestore, fetchDatapromFirestore } from '../../lib/firestoreSync';
 
 export const AdminModule: React.FC = () => {
   const { 
@@ -12,6 +13,54 @@ export const AdminModule: React.FC = () => {
     contractAlertDays, setContractAlertDays, generalLabels, updateGeneralLabel,
     userToolLinks, addUserToolLink, updateUserToolLink, deleteUserToolLink 
   } = useApp();
+
+  const [syncingCloud, setSyncingCloud] = useState(false);
+
+  const handleSyncToFirebase = async () => {
+    try {
+      setSyncingCloud(true);
+      await syncDataToFirestore({
+        users, services, contracts, mails, leaves, cashSessions, documents, tasks, vaultItems, emergencyContacts, userToolLinks, contractAlertDays, generalLabels
+      });
+      alert('Toutes les modifications ont été enregistrées et synchronisées avec succès sur Firebase Firestore !');
+    } catch (err: any) {
+      alert('Erreur lors de la synchronisation Firebase : ' + (err.message || 'Erreur inconnue'));
+    } finally {
+      setSyncingCloud(false);
+    }
+  };
+
+  const handleFetchFromFirebase = async () => {
+    if (!confirm('Voulez-vous récupérer les données stockées sur Firebase Firestore et remplacer l’état local ?')) return;
+    try {
+      setSyncingCloud(true);
+      const data = await fetchDatapromFirestore();
+      if (data) {
+        if (data.users) localStorage.setItem('min_mmm_users', JSON.stringify(data.users));
+        if (data.services) localStorage.setItem('min_mmm_services', JSON.stringify(data.services));
+        if (data.contracts) localStorage.setItem('min_mmm_contracts', JSON.stringify(data.contracts));
+        if (data.mails) localStorage.setItem('min_mmm_mails', JSON.stringify(data.mails));
+        if (data.leaves) localStorage.setItem('min_mmm_leaves', JSON.stringify(data.leaves));
+        if (data.cashSessions) localStorage.setItem('min_mmm_cash', JSON.stringify(data.cashSessions));
+        if (data.documents) localStorage.setItem('min_docs_v2', JSON.stringify(data.documents));
+        if (data.tasks) localStorage.setItem('min_mmm_tasks', JSON.stringify(data.tasks));
+        if (data.vaultItems) localStorage.setItem('min_mmm_vault', JSON.stringify(data.vaultItems));
+        if (data.emergencyContacts) localStorage.setItem('min_mmm_emergency', JSON.stringify(data.emergencyContacts));
+        if (data.userToolLinks) localStorage.setItem('min_mmm_tool_links', JSON.stringify(data.userToolLinks));
+        if (data.contractAlertDays) localStorage.setItem('min_mmm_alert_days', String(data.contractAlertDays));
+        if (data.generalLabels) localStorage.setItem('min_mmm_general_labels', JSON.stringify(data.generalLabels));
+
+        alert('Données récupérées avec succès depuis Firebase ! Rechargement de la page...');
+        window.location.reload();
+      } else {
+        alert('Aucune donnée trouvée sur Firestore.');
+      }
+    } catch (err: any) {
+      alert('Erreur lors de la récupération depuis Firebase : ' + (err.message || 'Erreur inconnue'));
+    } finally {
+      setSyncingCloud(false);
+    }
+  };
 
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingService, setEditingService] = useState<Service | null>(null);
@@ -324,20 +373,37 @@ export const AdminModule: React.FC = () => {
       </div>
 
       {/* Mode de Stockage & Synchronisation Firebase */}
-      <div className="rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-50/60 via-white to-teal-50/30 p-6 shadow-sm">
+      <div className="rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-50/60 via-white to-teal-50/30 p-6 shadow-sm space-y-4">
         <div className="flex items-start gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md shadow-emerald-600/30">
             <Shield className="h-6 w-6" />
           </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-bold text-slate-900">Mode de Stockage & Synchronisation Cloud</h3>
+          <div className="space-y-1 flex-1">
+            <h3 className="text-base font-bold text-slate-900">Mode de Stockage & Synchronisation Cloud Firebase</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Vos informations sont stockées de manière sécurisée sur <strong>Firebase Firestore</strong> (la base de données cloud NoSQL de Google Firebase), ce qui permet de synchroniser en temps réel toutes vos opérations, soldes et budgets entre votre PC, votre téléphone et tous vos autres appareils.
-            </p>
-            <p className="text-xs text-slate-600 leading-relaxed pt-1">
-              En complément, l'application utilise un stockage local sur votre navigateur pour un affichage instantané hors-ligne. Le système utilise la persistance hors-ligne native de Firestore (<code className="bg-emerald-100/70 text-emerald-800 px-1.5 py-0.5 rounded font-mono text-[11px]">enableIndexedDbPersistence</code>) à la place du localStorage pour le cache, afin de bénéficier d'un fonctionnement hors-ligne robuste sans la limite des 5 Mo.
+              Vos informations sont stockées de manière sécurisée sur <strong>Firebase Firestore</strong> (base de données cloud NoSQL), ce qui permet de synchroniser en temps réel toutes vos opérations, contrats, courriers et collaborateurs entre tous vos appareils.
             </p>
           </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-emerald-200/60">
+          <button
+            type="button"
+            onClick={handleSyncToFirebase}
+            disabled={syncingCloud}
+            className="flex items-center gap-2 rounded-xl bg-emerald-600 text-white px-4 py-2.5 text-xs font-bold hover:bg-emerald-500 transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50"
+          >
+            <Cloud className="h-4 w-4" />
+            <span>{syncingCloud ? 'Synchronisation...' : 'Enregistrer / Synchroniser sur Firebase'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleFetchFromFirebase}
+            disabled={syncingCloud}
+            className="flex items-center gap-2 rounded-xl bg-white border border-emerald-300 text-emerald-800 px-4 py-2.5 text-xs font-bold hover:bg-emerald-50 transition-all shadow-sm disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${syncingCloud ? 'animate-spin' : ''}`} />
+            <span>Récupérer les données depuis Firebase</span>
+          </button>
         </div>
       </div>
 

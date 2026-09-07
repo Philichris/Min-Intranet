@@ -8,7 +8,8 @@ import {
   INITIAL_LEAVES, INITIAL_CASH_SESSIONS, INITIAL_DOCUMENTS, INITIAL_TASKS,
   INITIAL_VAULT, INITIAL_EMERGENCY_CONTACTS, INITIAL_USER_TOOL_LINKS 
 } from '../data/mockData';
-import { saveFileToIDB, removeFileFromIDB } from '../utils/idbStorage';
+import { saveFileToIDB, removeFileFromIDB, getFileFromIDB } from '../utils/idbStorage';
+import { fetchDatapromFirestore } from '../lib/firestoreSync';
 
 interface AppContextType {
   currentUser: User | null;
@@ -92,11 +93,15 @@ interface AppContextType {
   
   getFilteredUniversalResults: () => {
     users: User[];
-    contracts: Contract[];
+    contracts: DocumentItem[];
     documents: DocumentItem[];
     mails: Mail[];
     services: Service[];
   };
+
+  consultingItem: { type: 'document' | 'contract' | 'mail' | 'user'; id: string } | null;
+  setConsultingItem: (item: { type: 'document' | 'contract' | 'mail' | 'user'; id: string } | null) => void;
+  consultDocument: (doc: DocumentItem) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -106,19 +111,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     let isMounted = true;
-    async function initIndexedDB() {
-      if (isMounted) {
-        setIsLoading(false);
+    async function initFirestoreSync() {
+      try {
+        const cloudData = await fetchDatapromFirestore();
+        if (cloudData && isMounted) {
+          if (cloudData.users) setUsers(cloudData.users);
+          if (cloudData.services) setServices(cloudData.services.map((s: any) => ({ ...s, subServices: s.subServices || [] })));
+          if (cloudData.contracts) setContracts(cloudData.contracts);
+          if (cloudData.mails) setMails(cloudData.mails);
+          if (cloudData.leaves) setLeaves(cloudData.leaves);
+          if (cloudData.cashSessions) setCashSessions(cloudData.cashSessions);
+          if (cloudData.documents) setDocuments(cloudData.documents);
+          if (cloudData.tasks) setTasks(cloudData.tasks);
+          if (cloudData.vaultItems) setVaultItems(cloudData.vaultItems);
+          if (cloudData.emergencyContacts) setEmergencyContacts(cloudData.emergencyContacts);
+          if (cloudData.userToolLinks) setUserToolLinks(cloudData.userToolLinks);
+          if (cloudData.contractAlertDays) setContractAlertDays(cloudData.contractAlertDays);
+          if (cloudData.generalLabels) setGeneralLabels(cloudData.generalLabels);
+          console.log('Base de données restaurée depuis Firestore avec succès.');
+        }
+      } catch (err) {
+        console.error('Erreur chargement Firestore au démarrage:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
-    initIndexedDB();
+    initFirestoreSync();
     return () => {
       isMounted = false;
     };
   }, []);
 
-  if (typeof window !== 'undefined' && !localStorage.getItem('min_mmm_db_cleared_v5')) {
+  if (typeof window !== 'undefined' && !localStorage.getItem('min_mmm_db_cleared_v7')) {
+    localStorage.removeItem('min_mmm_services');
     localStorage.removeItem('min_mmm_contracts');
+    localStorage.removeItem('min_docs_v2');
+    localStorage.removeItem('min_documents');
     localStorage.removeItem('min_mmm_mails');
     localStorage.removeItem('min_mmm_leaves');
     localStorage.removeItem('min_mmm_cash');
@@ -126,7 +154,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('min_mmm_vault');
     localStorage.removeItem('min_mmm_emergency');
     localStorage.removeItem('min_mmm_tool_links');
-    localStorage.setItem('min_mmm_db_cleared_v5', 'true');
+    localStorage.setItem('min_mmm_db_cleared_v7', 'true');
   }
 
   const [users, setUsers] = useState<User[]>(() => {
@@ -141,8 +169,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [services, setServices] = useState<Service[]>(() => {
     const saved = localStorage.getItem('min_mmm_services');
-    const parsed = saved ? JSON.parse(saved) : INITIAL_SERVICES;
-    return parsed.map((s: any) => ({ ...s, subServices: s.subServices || [] }));
+    let parsed = saved ? JSON.parse(saved) : INITIAL_SERVICES;
+    parsed = parsed.map((s: any) => {
+      if (s.id === 'srv-cont' || s.code === 'CONTRATS') {
+        return {
+          ...s,
+          name: 'Gestion des Contrats',
+          description: 'Fournisseurs, Clients et Marchés publics',
+          subServices: [
+            { id: 'fournisseurs', serviceId: 'srv-cont', name: 'Fournisseurs', code: 'FOURNISSEURS', description: 'Contrats et prestations fournisseurs' },
+            { id: 'clients', serviceId: 'srv-cont', name: 'Clients', code: 'CLIENTS', description: 'Baux, concessions et redevances clients' },
+            { id: 'marches_publics', serviceId: 'srv-cont', name: 'Marchés publics', code: 'MARCHES_PUBLICS', description: 'Marchés publics et appels d’offres' }
+          ]
+        };
+      }
+      return { ...s, subServices: s.subServices || [] };
+    });
+    return parsed;
   });
 
   const [contracts, setContracts] = useState<Contract[]>(() => {
@@ -262,6 +305,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [consultingItem, setConsultingItem] = useState<{ type: 'document' | 'contract' | 'mail' | 'user'; id: string } | null>(null);
 
   const [modalState, setModalState] = useState<{ type: string | null; data?: any }>({
     type: null,
@@ -618,18 +662,140 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUserToolLinks(prev => prev.filter(l => l.id !== id));
   }, []);
 
+  const consultDocument = useCallback(async (doc: DocumentItem) => {
+    let fileUrl = doc.fileUrl;
+    if (!fileUrl && doc.id) {
+      fileUrl = await getFileFromIDB(doc.id);
+    }
+    
+    if (!fileUrl) {
+      const previewHtml = `
+        <html>
+          <head>
+            <title>Consultation - ${doc.title}</title>
+            <style>
+              body { font-family: system-ui, sans-serif; padding: 40px; background: #f8fafc; color: #1e293b; }
+              .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+              .header { border-bottom: 2px solid #0284c7; padding-bottom: 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-start; }
+              h1 { font-size: 20px; color: #0f172a; margin: 0 0 8px 0; }
+              .meta { font-size: 13px; color: #64748b; }
+              .badge { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: bold; margin-bottom: 16px; }
+              .content { background: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 24px; line-height: 1.6; font-size: 14px; }
+              .actions { display: flex; justify-content: flex-end; gap: 12px; }
+              button, a { background: #0284c7; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 13px; border: none; cursor: pointer; }
+              button:hover, a:hover { background: #0369a1; }
+              .print-btn { background: #475569; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <div>
+                  <span class="badge">Marché d'Intérêt National • ${doc.serviceId?.toUpperCase() || 'OFFICIEL'}</span>
+                  <h1>${doc.title}</h1>
+                  <p class="meta">Réf : ${doc.ref || 'N/A'} • Auteur : ${doc.authorName || 'Direction'} • Date : ${doc.uploadDate || 'N/A'}</p>
+                </div>
+              </div>
+              <div class="content">
+                <strong>Description / Objet :</strong>
+                <p>${doc.description || 'Aucune description détaillée fournie pour ce document officiel.'}</p>
+                <p style="margin-top: 16px; color: #64748b; font-size: 12px;">Format : ${doc.fileType || 'PDF'} • Taille : ${doc.fileSize || '2.0 Mo'} • Statut : Document Officiel Validé</p>
+              </div>
+              <div class="actions">
+                <button class="print-btn" onclick="window.print()">Imprimer</button>
+                <button onclick="window.close()">Fermer</button>
+              </div>
+            </div>
+          </body>
+        </html>
+      `;
+      fileUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(previewHtml);
+    }
+
+    if (fileUrl) {
+      const win = window.open('', '_blank');
+      if (win) {
+        if (fileUrl.startsWith('data:text/html')) {
+          win.document.open();
+          win.document.write(decodeURIComponent(fileUrl.split(',')[1]));
+          win.document.close();
+        } else {
+          win.document.write(`
+            <html>
+              <head>
+                <title>Consultation - ${doc.title}</title>
+                <style>
+                  body { font-family: system-ui, sans-serif; padding: 30px; background: #0f172a; color: #f8fafc; text-align: center; }
+                  .container { max-width: 800px; margin: 0 auto; background: #1e293b; padding: 32px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+                  h1 { font-size: 18px; margin-bottom: 8px; }
+                  p { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
+                  iframe { width: 100%; height: 500px; border: none; border-radius: 8px; background: white; margin-top: 16px; }
+                  .actions { margin-top: 20px; display: flex; justify-content: center; gap: 12px; }
+                  a, button { background: #0284c7; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 13px; border: none; cursor: pointer; }
+                  a:hover, button:hover { background: #0284c7; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <h1>${doc.title}</h1>
+                  <p>Réf: ${doc.ref || 'N/A'} • Ajouté le ${doc.uploadDate || 'N/A'} • ${doc.fileSize || '2.0 Mo'}</p>
+                  <iframe src="${fileUrl}" title="${doc.title}"></iframe>
+                  <div class="actions">
+                    <a href="${fileUrl}" download="${doc.fileName || 'document'}">Télécharger le fichier</a>
+                    <button onclick="window.print()">Imprimer</button>
+                  </div>
+                </div>
+              </body>
+            </html>
+          `);
+          win.document.close();
+        }
+        return;
+      }
+    } else {
+      alert("Impossible d'ouvrir ce document.");
+    }
+  }, []);
+
   const getFilteredUniversalResults = useCallback(() => {
     const q = (searchQuery || '').toLowerCase();
     if (!q) return { users: [], contracts: [], documents: [], mails: [], services: [] };
 
+    const matchingDocs = documents.filter(d => 
+      (d?.title || '').toLowerCase().includes(q) ||
+      (d?.description || '').toLowerCase().includes(q) ||
+      (d?.fournisseurName || '').toLowerCase().includes(q) ||
+      (d?.clientName || '').toLowerCase().includes(q) ||
+      (d?.nomMarche || '').toLowerCase().includes(q) ||
+      (d?.category || '').toLowerCase().includes(q) ||
+      (d?.subCategory || '').toLowerCase().includes(q) ||
+      (d?.ref || '').toLowerCase().includes(q)
+    );
+
+    const contractDocs = matchingDocs.filter(d => d.serviceId?.toLowerCase() === 'contrats' || d.serviceId?.toLowerCase() === 'srv-cont' || ['fournisseurs', 'clients', 'marches_publics'].includes(d.category));
+    const generalDocs = matchingDocs.filter(d => !contractDocs.some(cd => cd.id === d.id));
+
     return {
-      users: users.filter(u => ((u?.firstName || '') + ' ' + (u?.lastName || '') + ' ' + (u?.email || '')).toLowerCase().includes(q)),
-      contracts: contracts.filter(c => ((c?.name || '') + ' ' + (c?.raisonSociale || '')).toLowerCase().includes(q)),
-      documents: documents.filter(d => ((d?.title || '') + ' ' + (d?.category || '')).toLowerCase().includes(q)),
-      mails: mails.filter(m => ((m?.subject || '') + ' ' + (m?.sender || '')).toLowerCase().includes(q)),
-      services: services.filter(s => ((s?.name || '') + ' ' + (s?.description || '')).toLowerCase().includes(q)),
+      users: users.filter(u => 
+        (u?.firstName || '').toLowerCase().includes(q) ||
+        (u?.lastName || '').toLowerCase().includes(q) ||
+        (u?.email || '').toLowerCase().includes(q) ||
+        (u?.fonction || '').toLowerCase().includes(q)
+      ),
+      contracts: contractDocs,
+      documents: generalDocs,
+      mails: mails.filter(m => 
+        (m?.subject || '').toLowerCase().includes(q) ||
+        (m?.sender || '').toLowerCase().includes(q) ||
+        (m?.recipient || '').toLowerCase().includes(q) ||
+        (m?.ref || '').toLowerCase().includes(q)
+      ),
+      services: services.filter(s => 
+        (s?.name || '').toLowerCase().includes(q) ||
+        (s?.description || '').toLowerCase().includes(q)
+      ),
     };
-  }, [searchQuery, users, contracts, documents, mails, services]);
+  }, [searchQuery, users, documents, mails, services]);
 
   const contextValue = useMemo(() => ({
     currentUser, setCurrentUser, users, services, contracts, mails, leaves, 
@@ -643,7 +809,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deleteDocument, addUser, updateUser, deleteUser, addService, updateService, 
     deleteService, addSubService, updateSubService, deleteSubService, moveSubService,
     addVaultItem, updateVaultItem, deleteVaultItem, addEmergencyContact, updateEmergencyContact, deleteEmergencyContact,
-    addUserToolLink, updateUserToolLink, deleteUserToolLink, getFilteredUniversalResults
+    addUserToolLink, updateUserToolLink, deleteUserToolLink, getFilteredUniversalResults,
+    consultingItem, setConsultingItem, consultDocument
   }), [
     currentUser, users, services, contracts, mails, leaves, cashSessions, documents,
     tasks, vaultItems, emergencyContacts, userToolLinks, contractAlertDays, generalLabels,
@@ -654,7 +821,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deleteUser, addService, updateService, deleteService, addSubService, updateSubService,
     deleteSubService, moveSubService, addVaultItem, updateVaultItem, deleteVaultItem,
     addEmergencyContact, updateEmergencyContact, deleteEmergencyContact, addUserToolLink,
-    updateUserToolLink, deleteUserToolLink, getFilteredUniversalResults, updateGeneralLabel
+    updateUserToolLink, deleteUserToolLink, getFilteredUniversalResults, updateGeneralLabel,
+    consultingItem, setConsultingItem, consultDocument
   ]);
 
   if (isLoading) {

@@ -139,13 +139,7 @@ export const Sidebar: React.FC = () => {
               {!collapsed && <span>{generalLabels.directory.menuLabel}</span>}
             </button>
 
-            <button
-              onClick={() => setActiveTab('documents')}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${activeTab === 'documents' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-900'}`}
-            >
-              <FolderKanban className={`h-4 w-4 shrink-0 ${activeTab === 'documents' ? 'text-white' : 'text-indigo-600'}`} />
-              {!collapsed && <span className="truncate">{generalLabels.documents.menuLabel}</span>}
-            </button>
+
 
             <button
               onClick={() => setActiveTab('vault')}
