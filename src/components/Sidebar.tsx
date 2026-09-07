@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { 
   LayoutDashboard, Users, Wrench, Calculator, FileText, ShieldCheck, 
   Briefcase, Mail, FolderKanban, Settings, ChevronLeft, ChevronRight, 
-  Building, Lock, PhoneCall, Bell
+  Building, Lock, PhoneCall, Bell, Cpu
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -78,6 +78,20 @@ export const Sidebar: React.FC = () => {
           activeClass: 'bg-sky-50 text-sky-800 border-l-4 border-sky-600 shadow-2xs font-bold',
           badgeClass: 'bg-sky-100 text-sky-800'
         };
+      case 'IT_RGPD':
+        return {
+          icon: <Cpu className="h-4 w-4" />,
+          colorClass: 'text-indigo-600',
+          activeClass: 'bg-indigo-50 text-indigo-800 border-l-4 border-indigo-600 shadow-2xs font-bold',
+          badgeClass: 'bg-indigo-100 text-indigo-800'
+        };
+      case 'LOCAUX':
+        return {
+          icon: <Building className="h-4 w-4" />,
+          colorClass: 'text-emerald-600',
+          activeClass: 'bg-emerald-50 text-emerald-800 border-l-4 border-emerald-600 shadow-2xs font-bold',
+          badgeClass: 'bg-emerald-100 text-emerald-800'
+        };
       default:
         return {
           icon: <Building className="h-4 w-4" />,
@@ -142,27 +156,19 @@ export const Sidebar: React.FC = () => {
 
 
             <button
+              onClick={() => setActiveTab('emergency')}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${activeTab === 'emergency' ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30' : 'text-slate-600 hover:bg-teal-50 hover:text-teal-900'}`}
+            >
+              <PhoneCall className={`h-4 w-4 shrink-0 ${activeTab === 'emergency' ? 'text-white' : 'text-teal-600'}`} />
+              {!collapsed && <span>{generalLabels.emergency.menuLabel}</span>}
+            </button>
+
+            <button
               onClick={() => setActiveTab('vault')}
               className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${activeTab === 'vault' ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30' : 'text-slate-600 hover:bg-purple-50 hover:text-purple-900'}`}
             >
               <Lock className={`h-4 w-4 shrink-0 ${activeTab === 'vault' ? 'text-white' : 'text-purple-600'}`} />
               {!collapsed && <span className="truncate">{generalLabels.vault.menuLabel}</span>}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('emergency')}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${activeTab === 'emergency' ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30' : 'text-slate-600 hover:bg-rose-50 hover:text-rose-900'}`}
-            >
-              <PhoneCall className={`h-4 w-4 shrink-0 ${activeTab === 'emergency' ? 'text-white' : 'text-rose-500'}`} />
-              {!collapsed && (
-                <div className="flex items-center justify-between w-full">
-                  <span>{generalLabels.emergency.menuLabel}</span>
-                  <span className="flex h-2 w-2 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-                  </span>
-                </div>
-              )}
             </button>
           </nav>
         </div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { LogoMIN } from './LogoMIN';
 import { 
-  Search, Bell, User as UserIcon, LogOut, Shield, ChevronDown, Building2, ExternalLink, X, Sparkles 
+  Search, Bell, User as UserIcon, LogOut, Shield, ChevronDown, Building2, ExternalLink, X 
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
@@ -190,15 +190,7 @@ export const Header: React.FC = () => {
 
       {/* Right User Actions */}
       <div className="flex items-center gap-3">
-        {/* Gemini AI Assistant Button */}
-        <button 
-          onClick={() => openModal('gemini_ai')}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-indigo-600/20 hover:opacity-90 transition-all"
-          title="Assistant IA Gemini (JSON Structuré)"
-        >
-          <Sparkles className="h-4 w-4" />
-          <span className="hidden sm:inline">Assistant IA</span>
-        </button>
+
 
         {/* Quick notification button */}
         <button 

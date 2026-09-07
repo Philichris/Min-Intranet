@@ -216,10 +216,10 @@ export const AdminModule: React.FC = () => {
         description: generalLabelsInput.vault.description || "Gestion chiffrée, sécurisée et personnelle des accès aux logiciels d'exploitation, GMAO et consoles techniques."
       },
       emergency: {
-        menuLabel: generalLabelsInput.emergency.menuLabel || 'Urgences & Astreintes',
-        badge: generalLabelsInput.emergency.badge || 'Poste Central de Sécurité (PCS) • Astreintes 24/7',
-        title: generalLabelsInput.emergency.title || 'Contacts d’Urgence & Permanences Techniques',
-        description: generalLabelsInput.emergency.description || "Annuaire opérationnel des astreintes, sécurité incendie, maintenance d'urgence et permanents du MIN."
+        menuLabel: generalLabelsInput.emergency.menuLabel || 'Annuaire Externe',
+        badge: generalLabelsInput.emergency.badge || 'Annuaire & Contacts Externes • Partenaires & Prestataires',
+        title: generalLabelsInput.emergency.title || 'Annuaire Externe & Partenaires',
+        description: generalLabelsInput.emergency.description || "Annuaire des prestataires extérieurs, partenaires, fournisseurs et contacts externes du MIN."
       }
     });
   };
@@ -583,7 +583,7 @@ export const AdminModule: React.FC = () => {
                 directory: 'Annuaire Collaborateurs',
                 documents: 'Bibliothèque Documents',
                 vault: 'Coffre-Fort (Mots de passe)',
-                emergency: 'Urgences & Astreintes'
+                emergency: 'Annuaire Externe'
               };
               const mod = generalLabelsInput[key];
               return (

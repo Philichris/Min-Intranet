@@ -162,6 +162,31 @@ export const INITIAL_SERVICES: Service[] = [
       { id: 'sub-courrier_reg', serviceId: 'srv-secr', name: 'Enregistrement Courrier Entrant / Sortant', code: 'COURRIER_REG', description: 'Flux physiques et numériques' },
       { id: 'sub-relances', serviceId: 'srv-secr', name: 'Attributions & Suivi des Délais', code: 'ATTRIBS', description: 'Suivi des actions et relances' }
     ]
+  },
+  {
+    id: 'srv-it-rgpd',
+    name: 'Espace Documentaire Informatique & RGPD',
+    code: 'IT_RGPD',
+    description: 'Gestion des systèmes d\'information, sécurité des données et conformité RGPD',
+    iconName: 'Cpu',
+    subServices: [
+      { id: 'sub-it-infra', serviceId: 'srv-it-rgpd', name: 'Infrastructure & Réseau', code: 'INFRA', description: 'Architecture réseaux, serveurs et télécoms' },
+      { id: 'sub-it-cybe', serviceId: 'srv-it-rgpd', name: 'Cybersécurité & Sauvegardes', code: 'CYBER', description: 'Politique de sécurité, PRA et PCA' },
+      { id: 'sub-it-rgpd', serviceId: 'srv-it-rgpd', name: 'Registre & Conformité RGPD', code: 'RGPD', description: 'Traitements, consentements et registres du DPO' },
+      { id: 'sub-it-support', serviceId: 'srv-it-rgpd', name: 'Support & Postes Utilisateurs', code: 'SUPPORT', description: 'Assistance technique et matériel informatique' }
+    ]
+  },
+  {
+    id: 'srv-locaux',
+    name: 'Gestion des Locaux & Bâtiments',
+    code: 'LOCAUX',
+    description: 'Attribution des emplacements, baux, états des lieux et maintenance des locaux',
+    iconName: 'Building',
+    subServices: [
+      { id: 'sub-loc-att', serviceId: 'srv-locaux', name: 'Attribution des Emplacements', code: 'ATTRIB', description: 'Gestion des stands, carreaux et entrepôts' },
+      { id: 'sub-loc-baux', serviceId: 'srv-locaux', name: 'Baux & Conventions d’Occupation', code: 'BAUX', description: 'Contrats de location et redevances domaniales' },
+      { id: 'sub-loc-edl', serviceId: 'srv-locaux', name: 'États des Lieux & Sinistres', code: 'EDL', description: 'Constats d\'entrée/sortie et assurances bâtiments' }
+    ]
   }
 ];
 

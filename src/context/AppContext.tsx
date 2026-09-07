@@ -146,10 +146,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       description: "Gestion chiffrée, sécurisée et personnelle des accès aux logiciels d'exploitation, GMAO et consoles techniques."
     },
     emergency: {
-      menuLabel: 'Urgences & Astreintes',
-      badge: 'Poste Central de Sécurité (PCS) • Astreintes 24/7',
-      title: 'Contacts d’Urgence & Permanences Techniques',
-      description: "Annuaire opérationnel des astreintes, sécurité incendie, maintenance d'urgence et permanents du MIN."
+      menuLabel: 'Annuaire Externe',
+      badge: 'Annuaire & Contacts Externes • Partenaires & Prestataires',
+      title: 'Annuaire Externe & Partenaires',
+      description: "Annuaire des prestataires extérieurs, partenaires, fournisseurs et contacts externes du MIN."
     }
   });
 
@@ -170,7 +170,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const cloudData = await fetchDataFromFirestore();
         if (cloudData && isMounted) {
           if (cloudData.users?.length) setUsers(cloudData.users);
-          if (cloudData.services?.length) setServices(cloudData.services.map((s: any) => ({ ...s, subServices: s.subServices || [] })));
+          if (cloudData.services?.length) {
+            const cloudServices = cloudData.services.map((s: any) => ({ ...s, subServices: s.subServices || [] }));
+            const existingIds = new Set(cloudServices.map((s: any) => s.id));
+            const existingCodes = new Set(cloudServices.map((s: any) => s.code));
+            const missingInitial = INITIAL_SERVICES.filter(s => !existingIds.has(s.id) && !existingCodes.has(s.code));
+            setServices([...cloudServices, ...missingInitial]);
+          }
           if (cloudData.contracts?.length) setContracts(cloudData.contracts);
           if (cloudData.mails?.length) setMails(cloudData.mails);
           if (cloudData.leaves?.length) setLeaves(cloudData.leaves);
