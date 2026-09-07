@@ -3,24 +3,20 @@ import { db } from './firebase';
 
 const COLLECTION = 'intranet_data';
 
-// Extraction intelligente : gère 'content', les tableaux et les objets indexés
-async function fetchDocContent(docId: string): Promise<any> {
+// Lit un document Firestore et convertit ses clés ("0", "1"...) en tableau JavaScript
+async function fetchDocArray(docId: string): Promise<any[]> {
   try {
     const docRef = doc(db, COLLECTION, docId);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const data = docSnap.data();
-      // Si le champ 'content' existe, on le prend, sinon on prend l'objet racine
+      // Si les données sont enveloppées dans content, on prend content, sinon l'objet racine
       const raw = data.content !== undefined ? data.content : data;
-      
-      // Si c'est un objet de type { "0": {...}, "1": {...} }, on le convertit en tableau
-      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-        return Object.values(raw);
-      }
-      return raw;
+      if (Array.isArray(raw)) return raw;
+      if (raw && typeof raw === 'object') return Object.values(raw);
     }
   } catch (error) {
-    console.error(`Erreur lors de la lecture de ${docId} :`, error);
+    console.error(`Erreur lecture ${docId}:`, error);
   }
   return [];
 }
@@ -38,44 +34,40 @@ export async function fetchDataFromFirestore(): Promise<any | null> {
       tasks,
       vaultItems,
       emergencyContacts,
-      userToolLinks,
-      alertDays,
-      labels
+      userToolLinks
     ] = await Promise.all([
-      fetchDocContent('min_mmm_users'),
-      fetchDocContent('min_mmm_services'),
-      fetchDocContent('min_mmm_contracts'),
-      fetchDocContent('min_mmm_mails'),
-      fetchDocContent('min_mmm_leaves'),
-      fetchDocContent('min_mmm_cash'),
-      fetchDocContent('min_docs_v2'),
-      fetchDocContent('min_mmm_tasks'),
-      fetchDocContent('min_mmm_vault'),
-      fetchDocContent('min_mmm_emergency'),
-      fetchDocContent('min_mmm_tool_links'),
-      fetchDocContent('min_mmm_alert_days'),
-      fetchDocContent('min_mmm_general_labels')
+      fetchDocArray('min_mmm_users'),
+      fetchDocArray('min_mmm_services'),
+      fetchDocArray('min_mmm_contracts'),
+      fetchDocArray('min_mmm_mails'),
+      fetchDocArray('min_mmm_leaves'),
+      fetchDocArray('min_mmm_cash'),
+      fetchDocArray('min_docs_v2'),
+      fetchDocArray('min_mmm_tasks'),
+      fetchDocArray('min_mmm_vault'),
+      fetchDocArray('min_mmm_emergency'),
+      fetchDocArray('min_mmm_tool_links')
     ]);
 
-    console.log("Utilisateurs extraits de Firestore :", users);
+    console.log("Utilisateurs réels chargés depuis Firestore :", users);
 
     return {
-      users: Array.isArray(users) ? users : [],
-      services: Array.isArray(services) ? services : [],
-      contracts: Array.isArray(contracts) ? contracts : [],
-      mails: Array.isArray(mails) ? mails : [],
-      leaves: Array.isArray(leaves) ? leaves : [],
-      cashSessions: Array.isArray(cashSessions) ? cashSessions : [],
-      documents: Array.isArray(documents) ? documents : [],
-      tasks: Array.isArray(tasks) ? tasks : [],
-      vaultItems: Array.isArray(vaultItems) ? vaultItems : [],
-      emergencyContacts: Array.isArray(emergencyContacts) ? emergencyContacts : [],
-      userToolLinks: Array.isArray(userToolLinks) ? userToolLinks : [],
-      contractAlertDays: typeof alertDays === 'number' ? alertDays : 90,
-      generalLabels: labels || null,
+      users,
+      services,
+      contracts,
+      mails,
+      leaves,
+      cashSessions,
+      documents,
+      tasks,
+      vaultItems,
+      emergencyContacts,
+      userToolLinks,
+      contractAlertDays: 90,
+      generalLabels: null,
     };
   } catch (error) {
-    console.error("Erreur générale Firestore :", error);
+    console.error("Erreur globale Firestore :", error);
     return null;
   }
 }
@@ -86,8 +78,9 @@ export async function fetchDatapromFirestore(): Promise<any | null> {
 
 export async function syncDataToFirestore(state: any): Promise<void> {
   try {
+    // Enregistre sous forme d'objet indexé { "0": {...}, "1": {...} } pour rester 100% compatible avec Firestore
     const save = (docId: string, data: any) => 
-      setDoc(doc(db, COLLECTION, docId), { content: data }, { merge: true });
+      setDoc(doc(db, COLLECTION, docId), Array.isArray(data) ? { ...data } : data);
 
     await Promise.all([
       save('min_mmm_users', state.users || []),
@@ -100,11 +93,9 @@ export async function syncDataToFirestore(state: any): Promise<void> {
       save('min_mmm_tasks', state.tasks || []),
       save('min_mmm_vault', state.vaultItems || []),
       save('min_mmm_emergency', state.emergencyContacts || []),
-      save('min_mmm_tool_links', state.userToolLinks || []),
-      save('min_mmm_alert_days', state.contractAlertDays || 90),
-      save('min_mmm_general_labels', state.generalLabels || {})
+      save('min_mmm_tool_links', state.userToolLinks || [])
     ]);
   } catch (error) {
-    console.error("Erreur lors de la sauvegarde vers Firestore :", error);
+    console.error("Erreur sauvegarde Firestore :", error);
   }
 }
