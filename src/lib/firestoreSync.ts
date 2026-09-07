@@ -1,5 +1,5 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db } from './firebase'; // ou './lib/firebase' selon où est situé firebase.ts
 
 const STATE_DOC_REF = doc(db, 'intranet_data', 'main_state');
 
@@ -32,4 +32,8 @@ export async function fetchDatapromFirestore(): Promise<any | null> {
     console.error('Erreur lors de la récupération depuis Firestore:', err);
     throw err;
   }
+}
+
+export async function fetchDataFromFirestore(): Promise<any | null> {
+  return fetchDatapromFirestore();
 }

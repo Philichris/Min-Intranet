@@ -9,7 +9,7 @@ import {
   INITIAL_VAULT, INITIAL_EMERGENCY_CONTACTS, INITIAL_USER_TOOL_LINKS 
 } from '../data/mockData';
 import { saveFileToIDB, removeFileFromIDB, getFileFromIDB } from '../utils/idbStorage';
-import { fetchDatapromFirestore } from '../lib/firestoreSync';
+import { fetchDataFromFirestore, syncDataToFirestore } from '../lib/firestoreSync';
 
 interface AppContextType {
   currentUser: User | null;
@@ -44,7 +44,6 @@ interface AppContextType {
   };
   openModal: (type: string, data?: any) => void;
   closeModal: () => void;
-
   login: (email: string, pass: string) => boolean;
   logout: () => void;
   
@@ -78,15 +77,12 @@ interface AppContextType {
   updateSubService: (serviceId: string, sub: SubService) => void;
   deleteSubService: (serviceId: string, subId: string) => void;
   moveSubService: (serviceId: string, subId: string, direction: 'up' | 'down') => void;
-
   addVaultItem: (item: Omit<VaultItem, 'id'>) => void;
   updateVaultItem: (item: VaultItem) => void;
   deleteVaultItem: (id: string) => void;
-
   addEmergencyContact: (contact: Omit<EmergencyContact, 'id'>) => void;
   updateEmergencyContact: (contact: EmergencyContact) => void;
   deleteEmergencyContact: (id: string) => void;
-
   addUserToolLink: (link: Omit<UserToolLink, 'id'>) => void;
   updateUserToolLink: (link: UserToolLink) => void;
   deleteUserToolLink: (id: string) => void;
@@ -98,7 +94,6 @@ interface AppContextType {
     mails: Mail[];
     services: Service[];
   };
-
   consultingItem: { type: 'document' | 'contract' | 'mail' | 'user'; id: string } | null;
   setConsultingItem: (item: { type: 'document' | 'contract' | 'mail' | 'user'; id: string } | null) => void;
   consultDocument: (doc: DocumentItem) => Promise<void>;
@@ -109,11 +104,71 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // États React initialisés de manière neutre (mis à jour par Firestore)
+  const [users, setUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('min_mmm_current_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [services, setServices] = useState<Service[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [mails, setMails] = useState<Mail[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
+  const [cashSessions, setCashSessions] = useState<CashSession[]>([]);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [vaultItems, setVaultItems] = useState<VaultItem[]>([]);
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
+  const [userToolLinks, setUserToolLinks] = useState<UserToolLink[]>([]);
+  const [contractAlertDays, setContractAlertDays] = useState<number>(90);
+  const [generalLabels, setGeneralLabels] = useState<GeneralLabels>({
+    dashboard: {
+      menuLabel: 'Tableau de Bord',
+      badge: 'Marché Marseille Méditerranée • Espace Intranet de Pilotage',
+      title: 'Tableau de Bord & Supervision des Flux',
+      description: "Vue d'ensemble consolidée des flux opérationnels, alertes contractuelles, courriers et tâches prioritaires du MIN."
+    },
+    directory: {
+      menuLabel: 'Annuaire Collaborateurs',
+      badge: 'Annuaire Professionnel & Équipes du MIN',
+      title: 'Répertoire des Équipes & Contacts',
+      description: "Recherchez, contactez et gérez l'organigramme, les permanents et les affectations des services du MIN."
+    },
+    documents: {
+      menuLabel: 'Bibliothèque Documents',
+      badge: 'Bibliothèque & Registre Documentaire Partagé',
+      title: 'Documents Officiels & Règlements Intérieurs',
+      description: "Accès centralisé aux procédures opérationnelles, notes de service, formulaires administratifs et chartes."
+    },
+    vault: {
+      menuLabel: 'Coffre-Fort (Mots de passe)',
+      badge: 'Coffre-Fort Sécurisé & Accès Systèmes',
+      title: 'Coffre-Fort Numérique & Identifiants Métiers',
+      description: "Gestion chiffrée, sécurisée et personnelle des accès aux logiciels d'exploitation, GMAO et consoles techniques."
+    },
+    emergency: {
+      menuLabel: 'Urgences & Astreintes',
+      badge: 'Poste Central de Sécurité (PCS) • Astreintes 24/7',
+      title: 'Contacts d’Urgence & Permanences Techniques',
+      description: "Annuaire opérationnel des astreintes, sécurité incendie, maintenance d'urgence et permanents du MIN."
+    }
+  });
+
+  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [consultingItem, setConsultingItem] = useState<{ type: 'document' | 'contract' | 'mail' | 'user'; id: string } | null>(null);
+  const [modalState, setModalState] = useState<{ type: string | null; data?: any }>({
+    type: null,
+    data: null,
+  });
+
+  // 1. Chargement initial depuis Firestore
   useEffect(() => {
     let isMounted = true;
     async function initFirestoreSync() {
       try {
-        const cloudData = await fetchDatapromFirestore();
+        const cloudData = await fetchDataFromFirestore();
         if (cloudData && isMounted) {
           if (cloudData.users) setUsers(cloudData.users);
           if (cloudData.services) setServices(cloudData.services.map((s: any) => ({ ...s, subServices: s.subServices || [] })));
@@ -136,99 +191,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (isMounted) setIsLoading(false);
       }
     }
+
     initFirestoreSync();
+
     return () => {
       isMounted = false;
     };
   }, []);
 
-  if (typeof window !== 'undefined' && !localStorage.getItem('min_mmm_db_cleared_v7')) {
-    localStorage.removeItem('min_mmm_services');
-    localStorage.removeItem('min_mmm_contracts');
-    localStorage.removeItem('min_docs_v2');
-    localStorage.removeItem('min_documents');
-    localStorage.removeItem('min_mmm_mails');
-    localStorage.removeItem('min_mmm_leaves');
-    localStorage.removeItem('min_mmm_cash');
-    localStorage.removeItem('min_mmm_tasks');
-    localStorage.removeItem('min_mmm_vault');
-    localStorage.removeItem('min_mmm_emergency');
-    localStorage.removeItem('min_mmm_tool_links');
-    localStorage.setItem('min_mmm_db_cleared_v7', 'true');
-  }
+  // 2. Synchronisation automatique des modifications vers Firestore (uniquement hors chargement)
+  useEffect(() => {
+    if (isLoading) return;
 
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('min_mmm_users');
-    return saved ? JSON.parse(saved) : INITIAL_USERS;
-  });
+    const stateToSync = {
+      users,
+      services,
+      contracts,
+      mails,
+      leaves,
+      cashSessions,
+      documents,
+      tasks,
+      vaultItems,
+      emergencyContacts,
+      userToolLinks,
+      contractAlertDays,
+      generalLabels,
+    };
 
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('min_mmm_current_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  const [services, setServices] = useState<Service[]>(() => {
-    const saved = localStorage.getItem('min_mmm_services');
-    let parsed = saved ? JSON.parse(saved) : INITIAL_SERVICES;
-    parsed = parsed.map((s: any) => {
-      if (s.id === 'srv-cont' || s.code === 'CONTRATS') {
-        return {
-          ...s,
-          name: 'Gestion des Contrats',
-          description: 'Fournisseurs, Clients et Marchés publics',
-          subServices: [
-            { id: 'fournisseurs', serviceId: 'srv-cont', name: 'Fournisseurs', code: 'FOURNISSEURS', description: 'Contrats et prestations fournisseurs' },
-            { id: 'clients', serviceId: 'srv-cont', name: 'Clients', code: 'CLIENTS', description: 'Baux, concessions et redevances clients' },
-            { id: 'marches_publics', serviceId: 'srv-cont', name: 'Marchés publics', code: 'MARCHES_PUBLICS', description: 'Marchés publics et appels d’offres' }
-          ]
-        };
-      }
-      return { ...s, subServices: s.subServices || [] };
-    });
-    return parsed;
-  });
-
-  const [contracts, setContracts] = useState<Contract[]>(() => {
-    const saved = localStorage.getItem('min_mmm_contracts');
-    const parsed = saved ? JSON.parse(saved) : INITIAL_CONTRACTS;
-    return parsed.map((c: any) => ({ ...c, responses: c.responses || [] }));
-  });
-
-  const [mails, setMails] = useState<Mail[]>(() => {
-    const saved = localStorage.getItem('min_mmm_mails');
-    const parsed = saved ? JSON.parse(saved) : INITIAL_MAILS;
-    return parsed.map((m: any) => ({ ...m, assignments: m.assignments || [] }));
-  });
-
-  const [leaves, setLeaves] = useState<LeaveRequest[]>(() => {
-    const saved = localStorage.getItem('min_mmm_leaves');
-    return saved ? JSON.parse(saved) : INITIAL_LEAVES;
-  });
-
-  const [cashSessions, setCashSessions] = useState<CashSession[]>(() => {
-    const saved = localStorage.getItem('min_mmm_cash');
-    return saved ? JSON.parse(saved) : INITIAL_CASH_SESSIONS;
-  });
-
-  const [documents, setDocuments] = useState<DocumentItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('min_docs_v2') || localStorage.getItem('min_documents') || localStorage.getItem('min_mmm_docs');
-      const loaded = saved ? JSON.parse(saved) : INITIAL_DOCUMENTS;
-      if (Array.isArray(loaded)) {
-        const existingIds = new Set(loaded.map((d: DocumentItem) => d.id));
-        const combined = [...loaded];
-        for (const initDoc of INITIAL_DOCUMENTS) {
-          if (!existingIds.has(initDoc.id)) {
-            combined.push(initDoc);
-          }
-        }
-        return combined;
-      }
-    } catch (e) {
-      console.error('Error loading documents:', e);
-    }
-    return INITIAL_DOCUMENTS;
-  });
+    syncDataToFirestore(stateToSync);
+  }, [
+    isLoading,
+    users,
+    services,
+    contracts,
+    mails,
+    leaves,
+    cashSessions,
+    documents,
+    tasks,
+    vaultItems,
+    emergencyContacts,
+    userToolLinks,
+    contractAlertDays,
+    generalLabels,
+  ]);
 
   const saveDocsToStorage = useCallback((docs: DocumentItem[]) => {
     try {
@@ -241,136 +248,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem('min_mmm_tasks');
-    return saved ? JSON.parse(saved) : INITIAL_TASKS;
-  });
-
-  const [vaultItems, setVaultItems] = useState<VaultItem[]>(() => {
-    const saved = localStorage.getItem('min_mmm_vault');
-    return saved ? JSON.parse(saved) : INITIAL_VAULT;
-  });
-
-  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>(() => {
-    const saved = localStorage.getItem('min_mmm_emergency');
-    return saved ? JSON.parse(saved) : INITIAL_EMERGENCY_CONTACTS;
-  });
-
-  const [userToolLinks, setUserToolLinks] = useState<UserToolLink[]>(() => {
-    const saved = localStorage.getItem('min_mmm_tool_links');
-    return saved ? JSON.parse(saved) : INITIAL_USER_TOOL_LINKS;
-  });
-
-  const [contractAlertDays, setContractAlertDays] = useState<number>(() => {
-    const saved = localStorage.getItem('min_mmm_alert_days');
-    return saved ? Number(saved) : 90;
-  });
-
-  const [generalLabels, setGeneralLabels] = useState<GeneralLabels>(() => {
-    const saved = localStorage.getItem('min_mmm_general_labels');
-    return saved ? JSON.parse(saved) : {
-      dashboard: {
-        menuLabel: 'Tableau de Bord',
-        badge: 'Marché Marseille Méditerranée • Espace Intranet de Pilotage',
-        title: 'Tableau de Bord & Supervision des Flux',
-        description: "Vue d'ensemble consolidée des flux opérationnels, alertes contractuelles, courriers et tâches prioritaires du MIN."
-      },
-      directory: {
-        menuLabel: 'Annuaire Collaborateurs',
-        badge: 'Annuaire Professionnel & Équipes du MIN',
-        title: 'Répertoire des Équipes & Contacts',
-        description: "Recherchez, contactez et gérez l'organigramme, les permanents et les affectations des services du MIN."
-      },
-      documents: {
-        menuLabel: 'Bibliothèque Documents',
-        badge: 'Bibliothèque & Registre Documentaire Partagé',
-        title: 'Documents Officiels & Règlements Intérieurs',
-        description: "Accès centralisé aux procédures opérationnelles, notes de service, formulaires administratifs et chartes."
-      },
-      vault: {
-        menuLabel: 'Coffre-Fort (Mots de passe)',
-        badge: 'Coffre-Fort Sécurisé & Accès Systèmes',
-        title: 'Coffre-Fort Numérique & Identifiants Métiers',
-        description: "Gestion chiffrée, sécurisée et personnelle des accès aux logiciels d'exploitation, GMAO et consoles techniques."
-      },
-      emergency: {
-        menuLabel: 'Urgences & Astreintes',
-        badge: 'Poste Central de Sécurité (PCS) • Astreintes 24/7',
-        title: 'Contacts d’Urgence & Permanences Techniques',
-        description: "Annuaire opérationnel des astreintes, sécurité incendie, maintenance d'urgence et permanents du MIN."
-      }
-    };
-  });
-
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [consultingItem, setConsultingItem] = useState<{ type: 'document' | 'contract' | 'mail' | 'user'; id: string } | null>(null);
-
-  const [modalState, setModalState] = useState<{ type: string | null; data?: any }>({
-    type: null,
-    data: null,
-  });
-
   const safeSetItem = useCallback((key: string, value: string) => {
     try {
       localStorage.setItem(key, value);
     } catch (e: any) {
       console.warn('LocalStorage quota exceeded for key:', key, e);
-      if (key === 'min_documents') {
-        try {
-          const parsed = JSON.parse(value);
-          const lightweight = parsed.map((d: any) => ({
-            ...d,
-            fileUrl: d.fileUrl && d.fileUrl.length > 50000 ? '[Fichier stocké en session/mémoire]' : d.fileUrl
-          }));
-          localStorage.setItem(key, JSON.stringify(lightweight));
-        } catch (err) {
-          console.error('Failed to save lightweight docs', err);
-        }
-      }
     }
   }, []);
 
-  // Persistence
-  useEffect(() => { if (!isLoading) safeSetItem('min_mmm_users', JSON.stringify(users)); }, [users, isLoading, safeSetItem]);
+  // Maintien du cache local pour la session en cours
   useEffect(() => { if (!isLoading) safeSetItem('min_mmm_current_user', JSON.stringify(currentUser)); }, [currentUser, isLoading, safeSetItem]);
-  useEffect(() => { if (!isLoading) safeSetItem('min_mmm_services', JSON.stringify(services)); }, [services, isLoading, safeSetItem]);
-  useEffect(() => { if (!isLoading) safeSetItem('min_mmm_contracts', JSON.stringify(contracts)); }, [contracts, isLoading, safeSetItem]);
-  useEffect(() => { if (!isLoading) safeSetItem('min_mmm_mails', JSON.stringify(mails)); }, [mails, isLoading, safeSetItem]);
-  useEffect(() => { if (!isLoading) safeSetItem('min_mmm_leaves', JSON.stringify(leaves)); }, [leaves, isLoading, safeSetItem]);
-  useEffect(() => { if (!isLoading) safeSetItem('min_mmm_cash', JSON.stringify(cashSessions)); }, [cashSessions, isLoading, safeSetItem]);
-  useEffect(() => { if (!isLoading) saveDocsToStorage(documents); }, [documents, isLoading, saveDocsToStorage]);
-  useEffect(() => { if (!isLoading) safeSetItem('min_mmm_tasks', JSON.stringify(tasks)); }, [tasks, isLoading, safeSetItem]);
-  useEffect(() => { if (!isLoading) safeSetItem('min_mmm_vault', JSON.stringify(vaultItems)); }, [vaultItems, isLoading, safeSetItem]);
-  useEffect(() => { if (!isLoading) safeSetItem('min_mmm_emergency', JSON.stringify(emergencyContacts)); }, [emergencyContacts, isLoading, safeSetItem]);
-  useEffect(() => { if (!isLoading) safeSetItem('min_mmm_tool_links', JSON.stringify(userToolLinks)); }, [userToolLinks, isLoading, safeSetItem]);
-  useEffect(() => { if (!isLoading) safeSetItem('min_mmm_alert_days', String(contractAlertDays)); }, [contractAlertDays, isLoading, safeSetItem]);
-  useEffect(() => { if (!isLoading) safeSetItem('min_mmm_general_labels', JSON.stringify(generalLabels)); }, [generalLabels, isLoading, safeSetItem]);
-
-  // Synchronisation inter-onglets
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (!e.key || !e.newValue) return;
-      try {
-        if (e.key === 'min_mmm_users') setUsers(JSON.parse(e.newValue));
-        if (e.key === 'min_mmm_services') setServices(JSON.parse(e.newValue));
-        if (e.key === 'min_mmm_contracts') setContracts(JSON.parse(e.newValue));
-        if (e.key === 'min_mmm_mails') setMails(JSON.parse(e.newValue));
-        if (e.key === 'min_mmm_leaves') setLeaves(JSON.parse(e.newValue));
-        if (e.key === 'min_mmm_cash') setCashSessions(JSON.parse(e.newValue));
-        if (e.key === 'min_docs_v2' || e.key === 'min_documents' || e.key === 'min_mmm_docs') setDocuments(JSON.parse(e.newValue));
-        if (e.key === 'min_mmm_tasks') setTasks(JSON.parse(e.newValue));
-        if (e.key === 'min_mmm_vault') setVaultItems(JSON.parse(e.newValue));
-        if (e.key === 'min_mmm_emergency') setEmergencyContacts(JSON.parse(e.newValue));
-        if (e.key === 'min_mmm_tool_links') setUserToolLinks(JSON.parse(e.newValue));
-      } catch (err) {
-        console.error('Storage sync error:', err);
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
 
   const updateGeneralLabel = useCallback((key: keyof GeneralLabels, field: keyof GeneralModuleLabel, value: string) => {
     setGeneralLabels(prev => ({
@@ -405,8 +292,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const respondToContract = useCallback((contractId: string, status: ContractDecisionStatus, comment?: string) => {
-    if (!currentUser) return; // Sécurisation contre currentUser === null
-
+    if (!currentUser) return;
     const newResponse: ContractResponse = {
       id: 'resp-' + Date.now(),
       contractId,
@@ -416,7 +302,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       comment,
       date: new Date().toISOString().split('T')[0]
     };
-
     setContracts(prev => prev.map(c => {
       if (c.id === contractId) {
         return {
@@ -427,7 +312,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return c;
     }));
-
     setTasks(prev => prev.map(t => t.title.includes(contractId) || t.description.includes(contractId) ? { ...t, status: 'Termine' } : t));
   }, [currentUser]);
 
@@ -711,7 +595,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `;
       fileUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(previewHtml);
     }
-
     if (fileUrl) {
       const win = window.open('', '_blank');
       if (win) {
@@ -760,7 +643,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const getFilteredUniversalResults = useCallback(() => {
     const q = (searchQuery || '').toLowerCase();
     if (!q) return { users: [], contracts: [], documents: [], mails: [], services: [] };
-
     const matchingDocs = documents.filter(d => 
       (d?.title || '').toLowerCase().includes(q) ||
       (d?.description || '').toLowerCase().includes(q) ||
@@ -771,10 +653,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (d?.subCategory || '').toLowerCase().includes(q) ||
       (d?.ref || '').toLowerCase().includes(q)
     );
-
     const contractDocs = matchingDocs.filter(d => d.serviceId?.toLowerCase() === 'contrats' || d.serviceId?.toLowerCase() === 'srv-cont' || ['fournisseurs', 'clients', 'marches_publics'].includes(d.category));
     const generalDocs = matchingDocs.filter(d => !contractDocs.some(cd => cd.id === d.id));
-
     return {
       users: users.filter(u => 
         (u?.firstName || '').toLowerCase().includes(q) ||
@@ -835,7 +715,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           </svg>
         </div>
         <h2 className="text-xl font-bold">Chargement de l'Intranet MIN Marseille...</h2>
-        <p className="text-sm text-slate-500 mt-2">Vérification et chargement initial de la base IndexedDB.</p>
+        <p className="text-sm text-slate-500 mt-2">Synchronisation avec la base de données Firestore (Paris)...</p>
       </div>
     );
   }
