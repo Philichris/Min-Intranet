@@ -1,22 +1,29 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDocFromServer, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 const COLLECTION = 'intranet_data';
 
-// Lit un document Firestore et convertit ses clés ("0", "1"...) en tableau JavaScript
-async function fetchDocArray(docId: string): Promise<any[]> {
+// Helper universel : extrait un tableau, qu'il soit dans `content` ou à la racine
+async function fetchAndNormalize(docId: string): Promise<any[]> {
   try {
     const docRef = doc(db, COLLECTION, docId);
-    const docSnap = await getDoc(docRef);
+    const docSnap = await getDocFromServer(docRef);
+    
     if (docSnap.exists()) {
       const data = docSnap.data();
-      // Si les données sont enveloppées dans content, on prend content, sinon l'objet racine
-      const raw = data.content !== undefined ? data.content : data;
-      if (Array.isArray(raw)) return raw;
-      if (raw && typeof raw === 'object') return Object.values(raw);
+      // 1. Si le champ 'content' existe
+      let target = data.content !== undefined ? data.content : data;
+      
+      // 2. Si c'est déjà un tableau
+      if (Array.isArray(target)) return target;
+      
+      // 3. Si c'est un objet (indexé ou non), on extrait ses valeurs
+      if (target && typeof target === 'object') {
+        return Object.values(target);
+      }
     }
   } catch (error) {
-    console.error(`Erreur lecture ${docId}:`, error);
+    console.warn(`Erreur de lecture sur ${docId}:`, error);
   }
   return [];
 }
@@ -34,22 +41,28 @@ export async function fetchDataFromFirestore(): Promise<any | null> {
       tasks,
       vaultItems,
       emergencyContacts,
-      userToolLinks
+      userToolLinks,
+      docCategories,
+      docSubfolders
     ] = await Promise.all([
-      fetchDocArray('min_mmm_users'),
-      fetchDocArray('min_mmm_services'),
-      fetchDocArray('min_mmm_contracts'),
-      fetchDocArray('min_mmm_mails'),
-      fetchDocArray('min_mmm_leaves'),
-      fetchDocArray('min_mmm_cash'),
-      fetchDocArray('min_docs_v2'),
-      fetchDocArray('min_mmm_tasks'),
-      fetchDocArray('min_mmm_vault'),
-      fetchDocArray('min_mmm_emergency'),
-      fetchDocArray('min_mmm_tool_links')
+      fetchAndNormalize('min_mmm_users'),
+      fetchAndNormalize('min_mmm_services'),
+      fetchAndNormalize('min_mmm_contracts'),
+      fetchAndNormalize('min_mmm_mails'),
+      fetchAndNormalize('min_mmm_leaves'),
+      fetchAndNormalize('min_mmm_cash'),
+      fetchAndNormalize('min_docs_v2').then(res => res.length ? res : fetchAndNormalize('min_mmm_docs')),
+      fetchAndNormalize('min_mmm_tasks'),
+      fetchAndNormalize('min_mmm_vault'),
+      fetchAndNormalize('min_mmm_emergency'),
+      fetchAndNormalize('min_mmm_tool_links'),
+      fetchAndNormalize('document_categories'),
+      fetchAndNormalize('document_subfolders')
     ]);
 
-    console.log("Utilisateurs réels chargés depuis Firestore :", users);
+    console.log("=== CHARGEMENT FIRESTORE RÉUSSI ===");
+    console.log("Utilisateurs :", users.length);
+    console.log("Documents :", documents.length);
 
     return {
       users,
@@ -63,6 +76,8 @@ export async function fetchDataFromFirestore(): Promise<any | null> {
       vaultItems,
       emergencyContacts,
       userToolLinks,
+      documentCategories: docCategories,
+      documentSubfolders: docSubfolders,
       contractAlertDays: 90,
       generalLabels: null,
     };
@@ -78,9 +93,8 @@ export async function fetchDatapromFirestore(): Promise<any | null> {
 
 export async function syncDataToFirestore(state: any): Promise<void> {
   try {
-    // Enregistre sous forme d'objet indexé { "0": {...}, "1": {...} } pour rester 100% compatible avec Firestore
     const save = (docId: string, data: any) => 
-      setDoc(doc(db, COLLECTION, docId), Array.isArray(data) ? { ...data } : data);
+      setDoc(doc(db, COLLECTION, docId), { content: data }, { merge: true });
 
     await Promise.all([
       save('min_mmm_users', state.users || []),
