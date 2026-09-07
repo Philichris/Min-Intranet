@@ -59,7 +59,7 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="space-y-8 p-8 max-w-7xl mx-auto">
       {/* Welcome banner with Mediterranean theme & MIN spectrum stripe */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-[#002B49] to-slate-900 p-8 text-white shadow-xl border border-slate-800">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-sky-50 via-indigo-50/60 to-blue-50 p-8 text-slate-900 shadow-sm border border-sky-200/80">
         <div className="absolute top-0 left-0 right-0 h-1.5 flex">
           <div className="flex-1 bg-[#84cc16]" />
           <div className="flex-1 bg-[#0284c7]" />
@@ -72,28 +72,28 @@ export const Dashboard: React.FC = () => {
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 pt-2">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-sky-500/20 px-3 py-1 text-xs font-bold text-sky-300 border border-sky-500/30 mb-3">
-              <span className="h-2 w-2 rounded-full bg-sky-400"></span>
+            <div className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1 text-xs font-bold text-sky-800 border border-sky-200 mb-3">
+              <span className="h-2 w-2 rounded-full bg-sky-600"></span>
               {generalLabels.dashboard.badge}
             </div>
-            <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+            <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900">
               {generalLabels.dashboard.title} • {currentUser.firstName} {currentUser.lastName}
             </h2>
-            <p className="mt-1 text-sm text-slate-300">
+            <p className="mt-1 text-sm text-slate-600">
               {generalLabels.dashboard.description} ({currentUser.fonction})
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button 
               onClick={() => setActiveTab('directory')}
-              className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-semibold text-white backdrop-blur-md hover:bg-white/20 transition-all border border-white/10 shadow-sm"
+              className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all border border-slate-200 shadow-sm"
             >
-              <Users className="h-4 w-4 text-[#06b6d4]" />
+              <Users className="h-4 w-4 text-[#0284c7]" />
               Annuaire des équipes
             </button>
             <button 
               onClick={() => openModal('add_mail')}
-              className="flex items-center gap-2 rounded-xl bg-[#0284c7] px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-sky-600/30 hover:bg-sky-500 transition-all"
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-indigo-600/30 hover:bg-indigo-500 transition-all"
             >
               <Mail className="h-4 w-4" />
               Enregistrer un courrier
